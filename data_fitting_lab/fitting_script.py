@@ -1,77 +1,162 @@
 import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-import re # Used for flexible data loading
+import re
 
-# --- 1. DEFINE YOUR MODEL FUNCTION ---
-# The first argument must be the independent variable (x),
-# followed by all the parameters you want the fit to find.
-# TODO: You will change this function for each experiment.
-def fit_function(x, a, b, c):
-    """A model function: f(x) = a * exp(b * x) + c"""
-    return a * np.exp(b * x) + c
-
-# --- 2. CONFIGURE THE SCRIPT ---
-# TODO: Change these two lines for each new data set.
-data_file = '/content/sample_data/my_exp_data.txt'
+# ==============================================================================
+# 1. USER CONFIGURATION
+# ==============================================================================
+# --- Data and Plotting ---
+data_file = '/content/sample_data/test2'
 num_columns = 2
+xaxis_label = 'X-axis Label'
+yaxis_label = 'Y-axis Label'
+plot_title = 'Function Fit'
 
-# --- 3. LOAD THE DATA ---
+# --- Fitting Function Definition ---
+# Define the equation as a string. Use 'x' for the independent variable.
+# Ensure you use 'np.' for numpy functions like exp, sin, cos, etc.
+fit_equation_string = "a * np.exp(b * x) + c"
+
+# List the parameter names used in the equation string IN ORDER.
+param_names = ['a', 'b', 'c']
+
+# Provide initial guesses for each parameter, in the same order as param_names.
+initial_guesses = [10.0, -1.0, 42.0]
+
+# --- Sanity Check (ensures lists have the same length) ---
+if len(param_names) != len(initial_guesses):
+    raise ValueError("The number of 'param_names' must match the number of 'initial_guesses'.")
+
+# ==============================================================================
+# 2. DYNAMIC FUNCTION CREATION
+# ==============================================================================
+
+def create_fit_function(expression_string, parameter_names):
+    """
+    Creates a Python function from a mathematical string expression.
+
+    Args:
+        expression_string (str): The mathematical formula (e.g., "a * np.exp(b * x) + c").
+        parameter_names (list): A list of strings with parameter names (e.g., ['a', 'b', 'c']).
+
+    Returns:
+        A callable function suitable for use with scipy.curve_fit.
+    """
+    # This is a factory: a function that returns another function.
+    # The returned function will be our model for curve_fit.
+    def fit_function(x, *params):
+        # Create a dictionary to hold the value of each parameter
+        # e.g., {'a': params[0], 'b': params[1], 'c': params[2]}
+        param_dict = {name: value for name, value in zip(parameter_names, params)}
+
+        # The 'locals' for the eval function. It needs to know 'x' and the parameter values.
+        local_vars = {'x': x, **param_dict}
+        
+        # The 'globals' for the eval function. It needs to know 'np' for numpy functions.
+        global_vars = {'np': np}
+
+        # Evaluate the expression string within the given context
+        return eval(expression_string, global_vars, local_vars)
+
+    return fit_function
+
+# Create the actual function object we will use for fitting
+fit_function = create_fit_function(fit_equation_string, param_names)
+
+
+# ==============================================================================
+# 3. DATA LOADING
+# ==============================================================================
 try:
     with open(data_file, 'r') as f:
         file_content = f.read()
-    # Split the content by any mix of spaces, commas, or tabs
     data = [float(num) for num in re.split(r'[ ,\t\n]+', file_content.strip()) if num]
     data_array = np.array(data).reshape(-1, num_columns)
     
-    # Generic unpacking of columns based on num_columns
-    columns = [data_array[:, i] for i in range(num_columns)]
-    print(f"Loaded {len(columns[0])} data points from {data_file}.")
-except Exception as e:
-    print(f"Error processing {data_file}: {e}")
-    print("Ensure the file path is correct and it contains the right number of columns.")
+    column = []
+    column.append(data_array[:, 0]) 
+    for column_number in range(num_columns): # index column array starting at 1
+        column.append(data_array[:, column_number]) 
+
+    print(f"Loaded data with {len(data_array[:,0])} data points.")
+
+except (IOError, ValueError, IndexError) as e:
+    print(f"Error processing '{data_file}': {e}")
+    print("Please check file path, num_columns, and data format.")
     exit()
 
-# --- 4. PROCESS DATA AND SET INITIAL GUESSES ---
-# TODO: Assign columns to x_data and y_data. Perform any needed math.
-x_data = columns[0]
-y_data = columns[1]
+# note: Python is typically uses 0-based indexing
+# but here the index is the column number.
+x_data = column[1]
+y_data = column[2]#+column[3]
 
-# TODO: Provide reasonable initial guesses for your fitting parameters.
-# The order must match the parameters in your fit_function definition!
-initial_guesses = [1.0, -1.0, 1.0]
-
-# --- 5. PERFORM THE CURVE FIT ---
+# ==============================================================================
+# 4. PERFORM CURVE FIT AND DISPLAY RESULTS
+# ==============================================================================
 try:
-    # The main fitting command from SciPy
+    # `popt` will be an array of the optimal parameter values
+    # `pcov` is the covariance matrix
     popt, pcov = curve_fit(fit_function, x_data, y_data, p0=initial_guesses)
 
-    # --- 6. PRINT AND VISUALIZE THE RESULTS ---
-    print("\n--- Fit Results ---")
-    param_names = fit_function.__code__.co_varnames[1:len(popt)+1]
-    for i, name in enumerate(param_names):
-        print(f"Optimal {name} = {popt[i]:.4f}")
-    
-    print("\n--- Parameter Errors ---")
-    perr = np.sqrt(np.diag(pcov)) # Standard errors
-    for i, name in enumerate(param_names):
-        print(f"Standard error for {name} = {perr[i]:.4f}")
+    # --- Print and interpret the results dynamically ---
+    print("\nFitting complete!")
+    print("Optimal parameters:")
+    perr = np.sqrt(np.diag(pcov)) # Standard errors on the parameters
 
-    x_fit_line = np.linspace(x_data.min(), x_data.max(), 100)
+    # Dynamically build the result string
+    result_strings = []
+    for i in range(len(popt)):
+        name = param_names[i]
+        value = popt[i]
+        error = perr[i]
+        print(f"  {name} = {value:.4f} +/- {error:.4f}")
+        result_strings.append(f"{name}={value:.2f}")
+
+    # --- Visualize the fit ---
+    x_fit_line = np.linspace(x_data.min(), x_data.max(), 200)
+    
+    # Use the star (*) operator to unpack the popt array into individual arguments
+    # This is equivalent to calling: fit_function(x_fit_line, popt[0], popt[1], popt[2], ...)
     y_fit_line = fit_function(x_fit_line, *popt)
 
     plt.figure(figsize=(10, 6))
-    plt.scatter(x_data, y_data, label='Experimental Data', color='blue')
-    plt.plot(x_fit_line, y_fit_line, 'r-', label='Fitted Function')
-    plt.title('Fit of Model to Experimental Data') # TODO: Change title
-    plt.xlabel('x-axis label (units)') # TODO: Change axis labels
-    plt.ylabel('y-axis label (units)') # TODO: Change axis labels
+    plt.scatter(x_data, y_data, label='Original Data', color='blue', s=20)
+    
+    # Create a dynamic label for the plot
+    fit_label = f"Fit: {', '.join(result_strings)}"
+    plt.plot(x_fit_line, y_fit_line, 'r-', label=fit_label)
+    
+    plt.title(plot_title)
+    plt.xlabel(xaxis_label)
+    plt.ylabel(yaxis_label)
     plt.legend()
     plt.grid(True)
     plt.show()
 
 except RuntimeError as e:
     print(f"\nCurve fitting failed: {e}")
-    print("This often means your initial guesses are too far off. Try adjusting them.")
+    print("This often means the fit could not converge.")
+    print("Try adjusting the `initial_guesses` or checking your data and equation.")
+
+    # --- Visualize the data with the INITIAL GUESSES to help debug ---
+    print("\nPlotting data with initial guess parameters...")
+    x_fit_line = np.linspace(x_data.min(), x_data.max(), 100)
+    
+    # Unpack the initial_guesses list
+    y_initial_line = fit_function(x_fit_line, *initial_guesses)
+    
+    initial_guess_label = f"Initial Guess: {', '.join([f'{n}={v:.2f}' for n, v in zip(param_names, initial_guesses)])}"
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(x_data, y_data, label='Original Data', color='blue')
+    plt.plot(x_fit_line, y_initial_line, 'g--', label=initial_guess_label) # Green dashed line for guess
+    plt.title('FAILED FIT - Initial Guess Visualization')
+    plt.xlabel(xaxis_label)
+    plt.ylabel(yaxis_label)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 except Exception as e:
     print(f"\nAn unexpected error occurred: {e}")
