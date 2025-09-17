@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entropy: The Universal Drive Towards Disorder</title>
+    <style>
+        /* Import Google Fonts for a modern, techy look */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400&display=swap');
+
+        /* General Body Styling */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); /* Energetic, warm-to-cool gradient */
+            color: #ecf0f1; /* Light text for contrast */
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh; /* Full viewport height */
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            box-sizing: border-box;
+        }
+
+        /* Main Heading */
+        h1 {
+            font-family: 'Orbitron', sans-serif; /* Sci-fi look */
+            color: #a0e0ff; /* Light blue */
+            text-shadow: 0 0 15px rgba(160, 224, 255, 0.7); /* Glowing effect */
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        /* Container for simulation and controls */
+        .container {
+            display: flex;
+            flex-wrap: wrap; /* Allows wrapping on smaller screens */
+            justify-content: center;
+            gap: 20px; /* Space between items */
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        /* Simulation Canvas Area */
+        .simulation-area {
+            background-color: rgba(0, 0, 0, 0.4); /* Semi-transparent dark background */
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(0, 255, 255, 0.3); /* Neon glow */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: fit-content;
+        }
+
+        /* Canvas Specific Styling */
+        canvas {
+            background-color: #2c3e50; /* Dark inner box */
+            border: 3px solid #00ffff; /* Neon border */
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+            margin-bottom: 10px; /* Reduced margin for counter */
+        }
+
+        /* Counter Display */
+        .counter-display {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-bottom: 15px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3em;
+            color: #ffe066; /* Yellowish */
+            text-shadow: 0 0 8px rgba(255, 224, 102, 0.6);
+        }
+        .counter-display span {
+            padding: 5px 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            box-shadow: inset 0 0 5px rgba(255,255,255,0.1);
+        }
+
+        /* Controls Panel */
+        .controls {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.4); /* Amber glow */
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 300px; /* Fixed width */
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            color: #ffe066; /* Yellowish for labels */
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        /* Slider Styling (Webkit/Firefox) */
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none; /* Remove default styling */
+            appearance: none;
+            height: 8px;
+            background: #4a4a4a; /* Dark track */
+            border-radius: 5px;
+            outline: none;
+            transition: opacity .2s;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ffff; /* Neon blue thumb */
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+            border: 2px solid #fff;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ffff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+            border: 2px solid #fff;
+        }
+
+        .value-display {
+            color: #b0e0e6; /* Muted blue for values */
+            font-size: 0.9em;
+            text-align: right;
+            margin-top: -3px; /* Align with slider */
+        }
+
+        /* Explanation Box */
+        .explanation {
+            background-color: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 25px rgba(173, 216, 230, 0.5); /* Light blue glow */
+            max-width: 800px;
+            width: 100%;
+            margin-top: 30px;
+        }
+
+        .explanation h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: #a0e0ff;
+            text-shadow: 0 0 10px rgba(160, 224, 255, 0.5);
+            margin-bottom: 10px;
+            font-size: 1.8em;
+        }
+
+        .explanation p {
+            line-height: 1.6;
+            margin-bottom: 10px;
+            color: #e0f2f7;
+        }
+
+        .explanation ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .explanation ul li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 8px;
+            color: #e0f2f7;
+        }
+
+        .explanation ul li::before {
+            content: '•'; /* Custom bullet point */
+            color: #00ffff;
+            position: absolute;
+            left: 0;
+            font-size: 1.2em;
+        }
+
+        /* Reset Button */
+        .reset-button {
+            background-color: #e74c3c; /* Red color */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            margin-top: 20px;
+            transition: background-color 0.3s ease, transform 0.1s ease; /* Smooth hover effects */
+        }
+
+        .reset-button:hover {
+            background-color: #c0392b; /* Darker red on hover */
+            transform: translateY(-2px);
+        }
+
+        .reset-button:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <h1>Entropy: The Universal Drive Towards Disorder</h1>
+
+    <div class="container">
+        <div class="simulation-area">
+            <div class="counter-display">
+                <span>Left: <span id="particlesLeft">0</span></span>
+                <span>Right: <span id="particlesRight">0</span></span>
+            </div>
+            <canvas id="entropyCanvas" width="600" height="400"></canvas>
+            <button class="reset-button" onclick="resetSimulation()">Reset Simulation</button>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="temperature">Temperature:</label>
+                <input type="range" id="temperature" min="1" max="100" value="25">
+                <span class="value-display" id="tempValue">25 units</span>
+            </div>
+            <div class="control-group">
+                <label for="particleSize">Particle Size:</label>
+                <input type="range" id="particleSize" min="2" max="15" value="5">
+                <span class="value-display" id="particleSizeValue">5 px</span>
+            </div>
+            <div class="control-group">
+                <label for="leftBarrierX">Inner Left Barrier Position:</label>
+                <input type="range" id="leftBarrierX" min="0" max="250" value="0">
+                <span class="value-display" id="leftBarrierXValue">0 px (Fully Open Left)</span>
+            </div>
+            <div class="control-group">
+                <label for="rightBottomHeight">Right Box Bottom Height:</label>
+                <input type="range" id="rightBottomHeight" min="0" max="150" value="0">
+                <span class="value-display" id="rightBottomValue">0 px (Even)</span>
+            </div>
+            <div class="control-group">
+                <label for="barrierHeight">Central Barrier Solid Height (from bottom):</label>
+                <input type="range" id="barrierHeight" min="0" max="400" value="400"> <!-- Changed default to 400 -->
+                <span class="value-display" id="barrierValue">400 px (Fully Closed)</span> <!-- Updated default text -->
+            </div>
+            <div class="control-group">
+                <label for="numParticles">Number of Particles:</label>
+                <input type="range" id="numParticles" min="10" max="200" value="80">
+                <span class="value-display" id="numParticlesValue">80</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="explanation">
+        <h2>What's Happening in the Box?</h2>
+        <p>This simulation visually demonstrates the concept of <strong>entropy</strong>, a fundamental principle in thermodynamics that measures the disorder or randomness within a system. Nature spontaneously moves towards states of higher entropy.</p>
+        <ul>
+            <li>
+                <strong>Initial State:</strong> All particles begin confined to the left side of the box (between the adjustable inner left barrier and the central barrier). This represents a highly ordered, low-entropy state because there are fewer possible arrangements for the particles.
+            </li>
+            <li>
+                <strong>Particle Dynamics:</strong> Each particle has kinetic energy (motion), influenced by the <strong>Temperature</strong> setting. Particles move randomly, interacting and colliding with walls and each other.
+            </li>
+            <li>
+                <strong>Diffusion & Equilibrium:</strong> Over time, particles find their way through the opening in the central barrier, spreading out into the entire available space. Eventually, they will distribute more or less evenly across both sides. This balanced distribution represents a high-entropy (disordered) state, as there are vastly more ways for particles to be arranged across the whole space.
+            </li>
+            <li>
+                <strong>Temperature:</strong> Controls the initial speed of the particles. Higher temperatures lead to faster movement, accelerating the system's progression towards equilibrium and higher entropy. (The scale has been adjusted to make '1 unit' feel more natural).
+            </li>
+            <li>
+                <strong>Particle Size:</strong> Adjusts the radius of the particles. Larger particles will collide more frequently and can impact the visual density and how quickly the system appears to reach equilibrium. Note that extremely large particles might struggle with small openings.
+            </li>
+            <li>
+                <strong>Inner Left Barrier Position:</strong> This movable barrier allows you to further restrict the available space on the left side of the central divider. By moving it inwards, you reduce the volume of the initial chamber, forcing particles into an even smaller space (increasing their local density and order) or creating a temporary trap between the very left wall and this new barrier.
+            </li>
+            <li>
+                <strong>Right Box Bottom Height:</strong> Elevating the bottom of the right chamber creates a "gravitational potential energy" barrier. Particles need more energy to reach and stay in the higher region. This illustrates how energy differences can influence the final equilibrium distribution, sometimes leading to an uneven spread, but still a maximal entropy for that specific energy profile.
+            </li>
+            <li>
+                <strong>Central Barrier Solid Height (from bottom):</strong> This slider controls how much of the central barrier is solid from the bottom upwards.
+                <ul>
+                    <li>A value of <strong>0 px</strong> means the barrier is completely open from the top, all the way to the bottom.</li>
+                    <li>A value of <strong>400 px</strong> (default and max) means the barrier is completely solid from the bottom to the top, fully separating the two sides.</li>
+                    <li>Intermediate values create an opening at the top, whose size can be reduced by increasing this slider.</li>
+                </ul>
+            </li>
+        </ul>
+        <p>The tendency of these particles to spread out and occupy all available space, moving from an ordered concentration to a more disordered distribution, is a direct analogy to how entropy governs many natural processes, from chemical reactions to the behavior of gases.</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('entropyCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const CANVAS_WIDTH = canvas.width;
+        const CANVAS_HEIGHT = canvas.height;
+
+        const LEFT_WALL = 0;
+        const RIGHT_WALL = CANVAS_WIDTH;
+        const TOP_WALL = 0;
+        const BOTTOM_WALL = CANVAS_HEIGHT;
+
+        let divisionX = CANVAS_WIDTH / 2; // Fixed vertical division line for the central barrier
+        // barrierOpeningBottomY now defines the bottom edge of the opening.
+        // If barrierHeightPx is 0, opening goes to BOTTOM_WALL. If 400, opening goes to 0 (closed).
+        let barrierOpeningBottomY = BOTTOM_WALL; // Initialized in updateSimulationParameters
+        let rightBoxBottomY = BOTTOM_WALL; // Bottom wall for the right box (dynamic via slider)
+        let leftBarrierX = LEFT_WALL; // Position of the inner left barrier (dynamic via slider)
+
+        // Particle properties
+        let PARTICLE_RADIUS = parseInt(document.getElementById('particleSize').value);
+        const PARTICLE_MASS = 1;
+        const GRAVITY = 0.05; // px/frame^2, small gravity to show effect without dominating
+
+        let particles = [];
+        let numParticles = parseInt(document.getElementById('numParticles').value);
+        let temperature = parseInt(document.getElementById('temperature').value);
+
+        // Control elements references
+        const tempSlider = document.getElementById('temperature');
+        const tempValueDisplay = document.getElementById('tempValue');
+        const particleSizeSlider = document.getElementById('particleSize');
+        const particleSizeValueDisplay = document.getElementById('particleSizeValue');
+        const leftBarrierXSlider = document.getElementById('leftBarrierX');
+        const leftBarrierXValueDisplay = document.getElementById('leftBarrierXValue');
+        const rightBottomSlider = document.getElementById('rightBottomHeight');
+        const rightBottomValueDisplay = document.getElementById('rightBottomValue');
+        const barrierHeightSlider = document.getElementById('barrierHeight'); // Now controls solid height from bottom
+        const barrierValueDisplay = document.getElementById('barrierValue');
+        const numParticlesSlider = document.getElementById('numParticles');
+        const numParticlesValueDisplay = document.getElementById('numParticlesValue');
+
+        // Counter display elements
+        const particlesLeftDisplay = document.getElementById('particlesLeft');
+        const particlesRightDisplay = document.getElementById('particlesRight');
+
+        // Particle Class definition
+        class Particle {
+            constructor(x, y, vx, vy, radius, mass) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = radius;
+                this.mass = mass;
+                this.color = `hsl(${Math.random() * 360}, 70%, 70%)`; // Random vibrant color for each particle
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+
+            update(dt) {
+                // Apply gravity
+                this.vy += GRAVITY;
+
+                // Update position
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+            }
+        }
+
+        // Initialize particles to start on the left side
+        function initParticles() {
+            particles = [];
+            numParticles = parseInt(numParticlesSlider.value);
+            temperature = parseInt(tempSlider.value);
+            PARTICLE_RADIUS = parseInt(particleSizeSlider.value); // Get current radius from slider
+
+            // Scaled temperature for initial speed: (temp / 20) makes '1 unit' less frantic
+            const initialSpeed = temperature / 20;
+
+            for (let i = 0; i < numParticles; i++) {
+                // Ensure particles start within the main left box boundaries (LEFT_WALL to divisionX)
+                // The `leftBarrierX` will act as an internal wall they can collide with.
+                // We'll place them to the right of the inner left barrier, but left of the central barrier
+                let x = Math.random() * ((divisionX - PARTICLE_RADIUS) - (leftBarrierX + PARTICLE_RADIUS)) + (leftBarrierX + PARTICLE_RADIUS);
+                let y = Math.random() * (BOTTOM_WALL - PARTICLE_RADIUS * 2) + PARTICLE_RADIUS;
+
+                // Give them random initial velocities based on temperature
+                let angle = Math.random() * Math.PI * 2;
+                let vx = Math.cos(angle) * initialSpeed;
+                let vy = Math.sin(angle) * initialSpeed;
+
+                particles.push(new Particle(x, y, vx, vy, PARTICLE_RADIUS, PARTICLE_MASS));
+            }
+        }
+
+        // Handles particle collisions with the main box walls, the dynamic right bottom wall, and the inner left barrier
+        function handleWallCollisions(p) {
+            // Determine the effective left boundary for the current particle
+            let effectiveLeftBoundary = LEFT_WALL;
+            if (leftBarrierX > LEFT_WALL && p.x < divisionX) {
+                 effectiveLeftBoundary = leftBarrierX;
+            }
+
+            // Collision with the effective left boundary (LEFT_WALL or inner left barrier)
+            if (p.x - p.radius < effectiveLeftBoundary) {
+                p.x = effectiveLeftBoundary + p.radius;
+                p.vx *= -1;
+            }
+
+            // Right Wall collision
+            if (p.x + p.radius > RIGHT_WALL) {
+                p.x = RIGHT_WALL - p.radius;
+                p.vx *= -1;
+            }
+
+            // Top Wall collision
+            if (p.y - p.radius < TOP_WALL) {
+                p.y = TOP_WALL + p.radius;
+                p.vy *= -1;
+            }
+
+            // Bottom Wall (dynamic for right side)
+            let currentBottomWall = BOTTOM_WALL;
+            if (p.x > divisionX) { // If particle is on the right side
+                currentBottomWall = rightBoxBottomY; // Use the elevated bottom
+            }
+            if (p.y + p.radius > currentBottomWall) {
+                p.y = currentBottomWall - p.radius;
+                p.vy *= -1;
+            }
+        }
+
+        // Handles particle collisions with the central dividing barrier
+        function handleDivisionCollisions(p) {
+            // Check if particle is roughly at the central division X coordinate
+            const isNearDivision = Math.abs(p.x - divisionX) < p.radius;
+
+            if (isNearDivision) {
+                // The opening in the central barrier is from TOP_WALL (0) to barrierOpeningBottomY.
+                // If a particle's Y position is OUTSIDE this range, it hits a solid part.
+                const inSolidPart = (p.y - p.radius < TOP_WALL || p.y + p.radius > barrierOpeningBottomY);
+
+                if (inSolidPart) {
+                    // Collision with the solid part of the central division wall
+                    // Resolve collision to prevent particle from passing through
+                    if (p.x < divisionX) { // Particle coming from left
+                        p.x = divisionX - p.radius;
+                        p.vx *= -1;
+                    } else { // Particle coming from right
+                        p.x = divisionX + p.radius;
+                        p.vx *= -1;
+                    }
+                }
+            }
+        }
+
+        // Handles elastic collisions between particles
+        function handleParticleCollisions() {
+            // This is an O(N^2) operation. For many particles, consider spatial partitioning (e.g., quadtree)
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p1 = particles[i];
+                    const p2 = particles[j];
+
+                    const dx = p1.x - p2.x;
+                    const dy = p1.y - p2.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < p1.radius + p2.radius) {
+                        // Collision detected! Resolve it.
+                        // Unit normal vector
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+
+                        // Unit tangent vector
+                        const tx = -ny;
+                        const ty = nx;
+
+                        // Project velocities onto the normal and tangent vectors
+                        const v1n = p1.vx * nx + p1.vy * ny;
+                        const v1t = p1.vx * tx + p1.vy * ty;
+                        const v2n = p2.vx * nx + p2.vy * ny;
+                        const v2t = p2.vy * ty + p2.vx * tx;
+
+                        // For elastic collision with equal masses, normal velocities just swap
+                        const v1n_after = v2n;
+                        const v2n_after = v1n;
+
+                        // Convert scalar normal and tangent velocities back to vector components
+                        p1.vx = v1n_after * nx + v1t * tx;
+                        p1.vy = v1n_after * ny + v1t * ty;
+                        p2.vx = v2n_after * nx + v2t * tx;
+                        p2.vy = v2n_after * ny + v2t * ty;
+
+                        // Separate particles to prevent sticking (simple push-apart)
+                        const overlap = (p1.radius + p2.radius) - distance;
+                        p1.x += nx * overlap / 2;
+                        p1.y += ny * overlap / 2;
+                        p2.x -= nx * overlap / 2;
+                        p2.y -= ny * overlap / 2;
+                    }
+                }
+            }
+        }
+
+        // Draws the main box, central division, inner left barrier, and dynamic right bottom wall
+        function drawBox() {
+            ctx.strokeStyle = '#00ffff'; // Neon blue outline
+            ctx.lineWidth = 3;
+            ctx.strokeRect(LEFT_WALL, TOP_WALL, CANVAS_WIDTH, BOTTOM_WALL);
+
+            // Draw the central division line, respecting the opening
+            ctx.beginPath();
+            // The solid part of the barrier goes from barrierOpeningBottomY to BOTTOM_WALL.
+            // If barrierOpeningBottomY is TOP_WALL (0), the entire barrier is solid.
+            if (barrierOpeningBottomY > TOP_WALL) { // Only draw if there's a solid part from bottom
+                ctx.moveTo(divisionX, barrierOpeningBottomY);
+                ctx.lineTo(divisionX, BOTTOM_WALL);
+            }
+            // Draw the top solid part if the opening doesn't extend to the top
+            if (barrierOpeningBottomY > TOP_WALL + 1) { // A small buffer to avoid drawing tiny lines if almost fully open
+                 ctx.moveTo(divisionX, TOP_WALL);
+                 ctx.lineTo(divisionX, TOP_WALL); // Effectively just drawing a point for the top boundary of the opening
+            }
+            // If it's fully closed (barrierOpeningBottomY is TOP_WALL), draw the full line
+            if (Math.abs(barrierOpeningBottomY - TOP_WALL) < 1) { // Check if it's virtually at the top
+                ctx.moveTo(divisionX, TOP_WALL);
+                ctx.lineTo(divisionX, BOTTOM_WALL);
+            }
+            ctx.stroke();
+
+            // NEW: Draw the inner left barrier if it's moved from the left edge
+            if (leftBarrierX > LEFT_WALL) {
+                ctx.beginPath();
+                ctx.moveTo(leftBarrierX, TOP_WALL);
+                ctx.lineTo(leftBarrierX, BOTTOM_WALL);
+                ctx.strokeStyle = '#ffff00'; // Yellow color for this new barrier
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.strokeStyle = '#00ffff'; // Reset to default neon blue
+            }
+
+            // Draw the elevated right bottom if it's raised
+            if (rightBoxBottomY < BOTTOM_WALL) {
+                ctx.beginPath();
+                ctx.moveTo(divisionX, rightBoxBottomY);
+                ctx.lineTo(RIGHT_WALL, rightBoxBottomY);
+                ctx.strokeStyle = '#ff6600'; // Different color for elevated bottom
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.strokeStyle = '#00ffff'; // Reset to default neon blue
+            }
+        }
+
+        // Function to update the particle counters
+        function updateParticleCounters() {
+            let leftCount = 0;
+            let rightCount = 0;
+            for (let i = 0; i < particles.length; i++) {
+                if (particles[i].x < divisionX) {
+                    leftCount++;
+                } else {
+                    rightCount++;
+                }
+            }
+            particlesLeftDisplay.textContent = leftCount;
+            particlesRightDisplay.textContent = rightCount;
+        }
+
+        let lastTime = 0; // For delta time calculation
+        function animate(currentTime) {
+            // Calculate delta time for consistent physics across different frame rates
+            const deltaTime = (currentTime - lastTime) / (1000 / 60); // Scale to approximately 60fps dt
+            lastTime = currentTime;
+
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); // Clear the entire canvas
+            drawBox(); // Redraw box and division
+
+            // Update and draw each particle
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                p.update(deltaTime);
+                handleWallCollisions(p);
+                handleDivisionCollisions(p);
+            }
+            handleParticleCollisions(); // Handle particle-particle collisions after all position updates
+
+            particles.forEach(p => p.draw()); // Draw all particles
+
+            updateParticleCounters(); // Update counters each frame
+
+            requestAnimationFrame(animate); // Loop the animation
+        }
+
+        // Updates simulation parameters based on slider values
+        function updateSimulationParameters() {
+            // Update PARTICLE_RADIUS from slider and apply to all existing particles
+            PARTICLE_RADIUS = parseInt(particleSizeSlider.value);
+            particles.forEach(p => p.radius = PARTICLE_RADIUS);
+
+            // Central Barrier: barrierHeightPx now means the height of the solid part from the BOTTOM.
+            // If barrierHeightPx is 0, barrierOpeningBottomY = BOTTOM_WALL (opening from top to bottom).
+            // If barrierHeightPx is CANVAS_HEIGHT (400), barrierOpeningBottomY = 0 (solid from top to bottom).
+            const barrierHeightPx = parseInt(barrierHeightSlider.value);
+            barrierOpeningBottomY = BOTTOM_WALL - barrierHeightPx;
+            // Ensure particles cannot get stuck if barrier closes on them
+            // This is a simple fix, better would be to push them out
+            if (barrierOpeningBottomY < TOP_WALL + PARTICLE_RADIUS * 2) barrierOpeningBottomY = TOP_WALL + PARTICLE_RADIUS * 2;
+
+
+            // Update right box bottom height
+            rightBoxBottomY = BOTTOM_WALL - parseInt(rightBottomSlider.value);
+
+            // NEW: Update inner left barrier position
+            leftBarrierX = parseInt(leftBarrierXSlider.value);
+            // Ensure left barrier stays within reasonable bounds relative to canvas and particles
+            if (leftBarrierX < LEFT_WALL) leftBarrierX = LEFT_WALL; // Cannot go left of canvas edge
+            // Cannot go beyond central division minus a particle diameter
+            if (leftBarrierX > divisionX - PARTICLE_RADIUS * 2) leftBarrierX = divisionX - PARTICLE_RADIUS * 2;
+
+
+            // Update display values for controls
+            tempValueDisplay.textContent = `${tempSlider.value} units`;
+            particleSizeValueDisplay.textContent = `${particleSizeSlider.value} px`;
+            leftBarrierXValueDisplay.textContent = `${leftBarrierXSlider.value} px (${leftBarrierXSlider.value == 0 ? 'Fully Open Left' : 'Restricted'})`;
+            rightBottomValueDisplay.textContent = `${rightBottomSlider.value} px (${rightBottomSlider.value == 0 ? 'Even' : 'Elevated'})`;
+            
+            // Adjust barrier display text based on value
+            let barrierText = `${barrierHeightSlider.value} px (`;
+            if (barrierHeightSlider.value == 0) barrierText += 'Fully Open)';
+            else if (barrierHeightSlider.value == CANVAS_HEIGHT) barrierText += 'Fully Closed)';
+            else barrierText += 'Opening from Top)';
+            barrierValueDisplay.textContent = barrierText;
+
+            numParticlesValueDisplay.textContent = numParticlesSlider.value;
+        }
+
+        // Resets the simulation to its initial state
+        function resetSimulation() {
+            updateSimulationParameters(); // Apply current slider values (critical for particle size and barrier positions)
+            initParticles(); // Re-initialize all particles (uses updated PARTICLE_RADIUS)
+            if (!lastTime) requestAnimationFrame(animate); // Start animation if not already running
+        }
+
+        // Event Listeners for control sliders
+        tempSlider.addEventListener('input', () => {
+            // Adjust current particle velocities based on new temperature
+            temperature = parseInt(tempSlider.value);
+            const speedScale = temperature / 20; // New scaled temperature for speed
+            particles.forEach(p => {
+                const currentSpeed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                if (currentSpeed > 0) {
+                    // Maintain direction, just scale speed
+                    p.vx = (p.vx / currentSpeed) * speedScale;
+                    p.vy = (p.vy / currentSpeed) * speedScale;
+                } else {
+                    // If particle was somehow stationary, give it new random direction
+                    let angle = Math.random() * Math.PI * 2;
+                    p.vx = Math.cos(angle) * speedScale;
+                    p.vy = Math.sin(angle) * speedScale;
+                }
+            });
+            tempValueDisplay.textContent = `${tempSlider.value} units`;
+        });
+
+        particleSizeSlider.addEventListener('input', updateSimulationParameters); // Updates particle radius on the fly
+        leftBarrierXSlider.addEventListener('input', updateSimulationParameters); // Inner Left Barrier slider listener
+        rightBottomSlider.addEventListener('input', updateSimulationParameters);
+        barrierHeightSlider.addEventListener('input', updateSimulationParameters); // Central Barrier slider listener
+        numParticlesSlider.addEventListener('change', resetSimulation); // Use 'change' to only reset when slider is released
+
+        // Initial setup calls
+        updateSimulationParameters(); // Call once to set initial parameters from sliders
+        initParticles();
+        requestAnimationFrame(animate); // Start the animation loop
+    </script>
+</body>
+</html>
