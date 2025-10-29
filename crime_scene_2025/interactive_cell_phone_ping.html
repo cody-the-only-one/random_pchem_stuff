@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pine Hollow Incident - Phone Location Data</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha26-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+        .legend {
+            padding: 6px 10px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .legend h4 { margin-top: 0; margin-bottom: 5px; }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.8;
+            border-radius: 50%;
+        }
+        .leaflet-tooltip {
+            background-color: #ffffff;
+            border: 1px solid #777;
+            padding: 4px 6px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+    // --- 1. Initialize the Map ---
+    const map = L.map('map').setView([34.378, -118.435], 11);
+
+    // --- 2. Add a Tile Layer (the map background) ---
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // --- 3. Key Locations ---
+    const campsiteLocation = [34.378, -118.435];
+    const tomasHomeLocation = [34.0671, -118.2559];
+
+    // --- 4. Full Phone Ping Data ---
+    // A simplified but complete list of key narrative points.
+    const pingData = [
+        // Travel to Campsite
+        { name: "Ethan Morales", lat: 34.1125, lng: -118.2933, time: "10-Jun 16:00" },
+        { name: "Marcus Blake", lat: 34.0988, lng: -118.3104, time: "10-Jun 16:00" },
+        { name: "Tomás Rivera", lat: tomasHomeLocation[0], lng: tomasHomeLocation[1], time: "10-Jun 16:00" },
+        { name: "Ethan Morales", lat: 34.2189, lng: -118.4529, time: "10-Jun 16:40" },
+        { name: "Marcus Blake", lat: 34.2190, lng: -118.4528, time: "10-Jun 16:40" },
+        { name: "Ethan Morales", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "10-Jun 17:40 (Arrival)" },
+        { name: "Marcus Blake", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "10-Jun 17:40 (Arrival)" },
+        { name: "Tomás Rivera", lat: 34.2809, lng: -118.4899, time: "10-Jun 18:20" },
+        { name: "Tomás Rivera", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "10-Jun 19:00 (Arrival)" },
+        // Last ping before incident
+        { name: "Ethan Morales", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "11-Jun 23:40" },
+        { name: "Marcus Blake", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "11-Jun 23:40" },
+        { name: "Tomás Rivera", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "11-Jun 23:40" },
+        // Post-Incident: Tomás leaves
+        { name: "Ethan Morales", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "12-Jun 00:00 (Static)" },
+        { name: "Marcus Blake", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "12-Jun 00:00 (Static)" },
+        { name: "Tomás Rivera", lat: 34.3215, lng: -118.4599, time: "12-Jun 00:00 (Leaving)" },
+        { name: "Tomás Rivera", lat: 34.2188, lng: -118.4527, time: "12-Jun 00:40" },
+        { name: "Tomás Rivera", lat: tomasHomeLocation[0], lng: tomasHomeLocation[1], time: "12-Jun 01:40 (Returns Home)" },
+        { name: "Tomás Rivera", lat: tomasHomeLocation[0], lng: tomasHomeLocation[1], time: "12-Jun 02:20 (At Home)" },
+        // Post-Incident: Tomás flees
+        { name: "Tomás Rivera", lat: 34.1505, lng: -118.2550, time: "12-Jun 02:40 (Fleeing)" },
+        { name: "Tomás Rivera", lat: 34.5330, lng: -118.2538, time: "12-Jun 03:40" },
+        { name: "Tomás Rivera", lat: 35.1023, lng: -118.2524, time: "12-Jun 05:00" },
+        { name: "Tomás Rivera", lat: 35.9555, lng: -118.2500, time: "12-Jun 07:00" },
+        { name: "Tomás Rivera", lat: 36.3821, lng: -118.2488, time: "12-Jun 08:00" },
+        // Final static pings for victims
+        { name: "Ethan Morales", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "12-Jun 08:00 (Static)" },
+        { name: "Marcus Blake", lat: campsiteLocation[0], lng: campsiteLocation[1], time: "12-Jun 08:00 (Static)" },
+    ];
+
+    // --- 5. Process and Draw Data on the Map ---
+    const subjectPaths = {
+        "Ethan Morales": { color: 'blue', latlngs: [] },
+        "Marcus Blake": { color: 'green', latlngs: [] },
+        "Tomás Rivera": { color: 'red', latlngs: [] }
+    };
+
+    // Create markers and populate path coordinates
+    pingData.forEach(ping => {
+        const subject = subjectPaths[ping.name];
+        if (!subject) return;
+
+        const coord = [ping.lat, ping.lng];
+        subject.latlngs.push(coord);
+
+        // Add a circle marker for each ping.
+        // **FIX**: Use .bindTooltip() to show data on HOVER.
+        L.circleMarker(coord, {
+            color: subject.color,
+            radius: 5,
+            fillOpacity: 0.7
+        }).addTo(map)
+          .bindTooltip(`<b>${ping.name}</b><br>${ping.time}`);
+    });
+
+    // Draw a polyline for each subject's path
+    for (const name in subjectPaths) {
+        L.polyline(subjectPaths[name].latlngs, { 
+            color: subjectPaths[name].color, 
+            weight: 3,
+            opacity: 0.7
+        }).addTo(map);
+    }
+
+    // --- 6. Add Special Markers for Key Locations ---
+    // This solves the problem of overlapping points at the crime scene.
+    L.marker(campsiteLocation)
+        .addTo(map)
+        .bindPopup(`
+            <b>Campsite / Crime Scene</b><br>
+            <u>Coordinates:</u> ${campsiteLocation[0].toFixed(4)}, ${campsiteLocation[1].toFixed(4)}<br>
+            - All three subjects present from 19:00 (June 10) to approx. 23:40 (June 11).<br>
+            - Last known location of Ethan Morales and Marcus Blake.
+        `);
+    
+    L.marker(tomasHomeLocation)
+        .addTo(map)
+        .bindPopup(`<b>Tomás Rivera's Residence</b><br>Briefly returned here after leaving the campsite before fleeing north.`);
+
+    // --- 7. Add a Legend ---
+    const legend = L.control({position: 'bottomright'});
+    legend.onAdd = function (map) {
+        const div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML += '<h4>Subject Paths</h4>';
+        for (const name in subjectPaths) {
+            div.innerHTML += 
+                '<i style="background:' + subjectPaths[name].color + '"></i> ' + name + '<br>';
+        }
+        return div;
+    };
+    legend.addTo(map);
+
+</script>
+</body>
+</html>
