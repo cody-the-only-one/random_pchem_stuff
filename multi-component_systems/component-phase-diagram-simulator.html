@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binary Phase Diagram Simulator</title>
+    <!-- Load Plotly.js for charting -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+            font-size: 1.1em; /* Increased base font size */
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .controls, .plot-area {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .controls > div {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+        h1, h2, h3 {
+            font-size: 1.3em; /* Adjusted heading size */
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 1em; /* Adjusted label size */
+        }
+        input[type="number"], input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        #plot {
+            height: 600px;
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+        .explanation {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9e9ff;
+            border-left: 5px solid #6c757d;
+            font-size: 0.9em;
+        }
+        
+        /* Tooltip Styles (kept small for readability) */
+        [data-tooltip]::after {
+            font-size: 12px;
+        }
+
+        .output-box {
+            border: 1px dashed #6c757d;
+            padding: 10px;
+            margin-top: 15px;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 data-tooltip="This simulator models the liquid-vapor equilibrium of a two-component system using ideal thermodynamic principles (Raoult's Law).">
+        Binary Phase Diagram Simulator (Ideal Solutions)
+    </h1>
+
+    <div class="controls">
+        <div data-tooltip="Input parameters for the pure components. Component 1 is assumed to be the more volatile component (higher P* and lower T*).">
+            <h2>Component Parameters</h2>
+            <label for="p1_star">P₁* (Vapor Pressure, Comp 1):</label>
+            <input type="number" id="p1_star" value="150" min="1" step="0.1"> mmHg
+
+            <label for="p2_star">P₂* (Vapor Pressure, Comp 2):</label>
+            <input type="number" id="p2_star" value="50" min="1" step="0.1"> mmHg
+            
+            <p data-tooltip="These define the pure boiling points at constant pressure.">
+                <label for="t1_bp">T₁* (Boiling Point, Comp 1):</label>
+                <input type="number" id="t1_bp" value="90" step="0.1" disabled> °C
+                <label for="t2_bp">T₂* (Boiling Point, Comp 2):</label>
+                <input type="number" id="t2_bp" value="120" step="0.1" disabled> °C
+            </p>
+            <p class="explanation">T* inputs are disabled as the T-x/y diagram is removed, but the data is kept internally.</p>
+        </div>
+        
+        <div data-tooltip="Select which diagrams or curves to display. P-x/y uses the primary Y-axis (Pressure). The Equilibrium Curve uses the secondary Y-axis (Mole Fraction).">
+            <h2>Plot Selection</h2>
+            <label>
+                <input type="checkbox" id="plot_p_comp" onchange="updatePlot()" checked>
+                Pressure-Composition (P-x/y) Diagram (Y1 Axis: Pressure)
+            </label>
+            <label>
+                <input type="checkbox" id="plot_yx_curve" onchange="updatePlot()">
+                Equilibrium Curve (y₁ vs x₁) (Y2 Axis: Mole Fraction)
+            </label>
+            
+            <label for="points">Plot Resolution (Points):</label>
+            <input type="number" id="points" value="50" min="10" max="200" step="1">
+            <button onclick="updatePlot()" style="margin-top: 10px; padding: 10px;">Generate Plot</button>
+        </div>
+
+        <div data-tooltip="The y₁ vs x₁ equilibrium curve is derived from Raoult's Law and Dalton's Law (Eq 7.19), showing the ideal composition relationship between vapor and liquid phases.">
+            <p class="explanation">
+                Note: Both plots share the X-axis (Mole Fraction x₁). If the Equilibrium Curve is selected, a secondary Y-axis (Y2) ranging from 0 to 1 will appear on the right.
+            </p>
+        </div>
+    </div>
+
+    <div class="plot-area">
+        <div id="plot"></div>
+    </div>
+
+    <h3 data-tooltip="The tie line connects the liquid composition (Bubble Point) with the vapor composition (Dew Point) that are in equilibrium. Click the Bubble Point Line to draw a tie line.">
+        Tie Line & Equilibrium Data:
+    </h3>
+    <div id="equilibrium_output" class="output-box">
+        Select a P-x/y diagram, then click the Bubble Point line (blue line) to see equilibrium compositions.
+    </div>
+
+</div>
+<script>
+    // Constants and Utility
+    const R = 8.314;
+    const PLOT_FONT_SIZE = 20; // Base font size for plot elements
+
+    // Elements
+    // ... (All element definitions remain the same) ...
+    const p1StarEl = document.getElementById('p1_star');
+    const p2StarEl = document.getElementById('p2_star');
+    const t1BpEl = document.getElementById('t1_bp');
+    const t2BpEl = document.getElementById('t2_bp');
+    const resolutionEl = document.getElementById('points');
+    const outputEl = document.getElementById('equilibrium_output');
+    const plotContainer = document.getElementById('plot');
+    
+    // Checkbox elements
+    const plotPCompEl = document.getElementById('plot_p_comp');
+    const plotYXCurveEl = document.getElementById('plot_yx_curve');
+
+    let baseTraces = [];
+    let equilibriumMap = {}; // Maps x1 (rounded) to y1
+    
+    const baseLayout = {
+        title: { 
+            text: '',
+            font: { size: PLOT_FONT_SIZE + 4 } // Title slightly larger
+        },
+        hovermode: 'closest',
+        xaxis: { 
+            title: { text: 'Mole Fraction of Component 1 (x₁)', font: { size: PLOT_FONT_SIZE + 2 } },
+            range: [0, 1],
+            tickfont: { size: PLOT_FONT_SIZE } // Tick labels
+        },
+        // yaxis is dynamically defined
+        legend: { font: { size: PLOT_FONT_SIZE } },
+        showlegend: true
+    };
+
+    /**
+     * Core Function: Calculates Ideal Phase Data (P-x/y format).
+     * This data is used for both P-Comp and the y1-x1 curve.
+     */
+    function calculatePhaseData(P1_star, P2_star, N) {
+        let x = [];
+        let P_bubble = [];
+        let y_dew = [];
+        let P_dew = [];
+        
+        equilibriumMap = {}; 
+
+        for (let i = 0; i <= N; i++) {
+            let x1 = i / N;
+            x.push(x1);
+
+            // P_tot = P2* + (P1* - P2*)x1
+            let P_tot_x = P2_star + (P1_star - P2_star) * x1;
+            
+            P_tot_x = Math.max(1, P_tot_x);
+            P_bubble.push(P_tot_x);
+
+            // y1 = (x1 * P1*) / P_tot_x (Equation 7.19 equivalent for ideal solution)
+            let P1 = x1 * P1_star;
+            let y1 = P1 / P_tot_x;
+            
+            y1 = Math.min(1, Math.max(0, y1));
+            
+            y_dew.push(y1);
+            P_dew.push(P_tot_x);
+            
+            equilibriumMap[x1.toFixed(4)] = y1;
+        }
+
+        return { x, P_bubble, y_dew, P_dew, P1_star, P2_star };
+    }
+
+    function updatePlot() {
+        const P1_star = parseFloat(p1StarEl.value);
+        const P2_star = parseFloat(p2StarEl.value);
+        const N = parseInt(resolutionEl.value);
+        
+        const doPComp = plotPCompEl.checked;
+        const doYXCurve = plotYXCurveEl.checked;
+
+        if (!doPComp && !doYXCurve) {
+            Plotly.newPlot(plotContainer, [], baseLayout);
+            outputEl.textContent = 'Select at least one plot type.';
+            return;
+        }
+
+        const P_data = calculatePhaseData(P1_star, P2_star, N);
+        
+        let plot_title = 'Ideal Binary Phase Diagram';
+        let traces = [];
+        let layout_updates = {};
+        
+        // --- 1. P-Composition (Primary Y1 Axis) ---
+        
+        if (doPComp) {
+            // Add Bubble Line (x1 vs P_tot)
+            traces.push({
+                x: P_data.x,
+                y: P_data.P_bubble,
+                mode: 'lines',
+                name: 'P: Bubble Line (x₁)',
+                line: { color: 'blue', width: 3 },
+                yaxis: 'y1',
+                hovertemplate: 'x₁ (Liquid): %{x}<br>Pressure: %{y:.2f} mmHg<extra></extra>' 
+            });
+            
+            // Add Dew Line (y1 vs P_tot)
+            let dewPoints = P_data.y_dew.map((x, i) => ({ x, y: P_data.P_dew[i] })).sort((a, b) => a.x - b.x);
+            traces.push({
+                x: dewPoints.map(p => p.x),
+                y: dewPoints.map(p => p.y),
+                mode: 'lines',
+                name: 'P: Dew Line (y₁)',
+                line: { color: 'red', dash: 'dash', width: 3 },
+                yaxis: 'y1',
+                hovertemplate: 'y₁ (Vapor): %{x}<br>Pressure: %{y:.2f} mmHg<extra></extra>'
+            });
+            
+            // Y1 setup for Pressure
+            layout_updates.yaxis = { 
+                title: { text: 'Total Pressure (P_tot) / mmHg', font: { size: PLOT_FONT_SIZE + 2 } }, 
+                zeroline: false,
+                tickfont: { size: PLOT_FONT_SIZE }
+            };
+            plot_title = `P-Composition (T Constant) | P₁*=${P1_star}, P₂*=${P2_star}`;
+        }
+        
+        // --- 2. Equilibrium Curve (Y2 Axis) ---
+
+        if (doYXCurve) {
+            
+            // Y2 Axis configuration
+            layout_updates.yaxis2 = {
+                title: { text: 'Vapor Mole Fraction (y₁) (Y2 Axis)', font: { size: PLOT_FONT_SIZE + 2 } },
+                overlaying: 'y', 
+                side: 'right',
+                range: [0, 1],
+                showgrid: false,
+                zeroline: true,
+                tickfont: { size: PLOT_FONT_SIZE }
+            };
+            
+            // If ONLY the YX curve is plotted, use Y1 for primary display
+            if (!doPComp) {
+                layout_updates.yaxis = { 
+                    title: { text: 'Vapor Mole Fraction (y₁) (Y1)', font: { size: PLOT_FONT_SIZE + 2 } }, 
+                    range: [0, 1], 
+                    zeroline: true,
+                    tickfont: { size: PLOT_FONT_SIZE }
+                };
+                layout_updates.yaxis2 = undefined; // No Y2 needed if YX is Y1
+                
+                // Add Equilibrium Curve
+                traces.push({
+                    x: P_data.x,
+                    y: P_data.y_dew, 
+                    mode: 'lines',
+                    name: 'Equilibrium Curve (y₁ vs x₁)',
+                    line: { color: 'darkgreen', width: 3 },
+                    yaxis: 'y1', 
+                    hovertemplate: 'x₁: %{x}<br>y₁: %{y:.4f}<extra></extra>'
+                });
+            } else {
+                 // Add Equilibrium Curve to Y2 (when P-Comp is also present)
+                 traces.push({
+                    x: P_data.x,
+                    y: P_data.y_dew, 
+                    mode: 'lines',
+                    name: 'Equilibrium Curve (y₁ vs x₁)',
+                    line: { color: 'darkgreen', width: 2 },
+                    yaxis: 'y2', 
+                    hovertemplate: 'x₁: %{x}<br>y₁: %{y:.4f}<extra></extra>'
+                });
+            }
+        }
+        
+        // --- 3. Final Layout and Plotting ---
+
+        let layout = JSON.parse(JSON.stringify(baseLayout)); 
+        layout.title.text = plot_title;
+        
+        // Apply Y1 axis settings
+        if (layout_updates.yaxis) {
+            layout.yaxis = layout_updates.yaxis;
+        } else {
+             layout.yaxis = { title: 'Y-Axis', zeroline: false };
+        }
+        
+        // Apply Y2 axis settings
+        if (layout_updates.yaxis2) {
+            layout.yaxis2 = layout_updates.yaxis2;
+        }
+
+        baseTraces = traces; 
+        Plotly.react(plotContainer, baseTraces, layout, {responsive: true});
+        
+        // --- 4. Setup Interaction ---
+        plotContainer.removeAllListeners('plotly_click');
+        plotContainer.on('plotly_click', (data) => {
+            if (data.points.length === 0) return;
+            const point = data.points[0];
+            
+            // Check if click is on the P-Comp Bubble Point Line (Trace index 0) AND P-Comp is enabled
+            if (doPComp && point.curveNumber === 0) {
+                const x_L_raw = point.x;
+                const P_eq = point.y;
+                
+                const x_L_key = x_L_raw.toFixed(4);
+                const y_V = equilibriumMap[x_L_key];
+                
+                if (y_V === undefined) {
+                    outputEl.textContent = 'Error: Could not find matching vapor composition (y1). Try increasing resolution.';
+                    return;
+                }
+
+                drawTieLine(x_L_raw, y_V, P_eq);
+                
+                outputEl.innerHTML = `
+                    Equilibrium Established at Pressure: <b>${P_eq.toFixed(2)}</b> mmHg<br>
+                    Liquid Phase Composition (x₁): <b>${x_L_raw.toFixed(4)}</b><br>
+                    Vapor Phase Composition (y₁) (Y2): <b>${y_V.toFixed(4)}</b><br>
+                    Vapor enriched in Comp 1.
+                `;
+            } else {
+                outputEl.textContent = 'Click only the Bubble Point line (blue line) of the Pressure-Composition diagram.';
+            }
+        });
+    }
+
+    // Since T-Comp is removed, we only draw the tie line on the Y1 (Pressure) axis
+    function drawTieLine(x_L, y_V, P_eq) {
+        const tieLineTrace = {
+            x: [x_L, y_V],
+            y: [P_eq, P_eq],
+            mode: 'lines+markers',
+            name: 'Tie Line',
+            line: { color: 'green', dash: 'dot', width: 2 },
+            marker: { size: 10, color: ['blue', 'red'] },
+            yaxis: 'y1',
+            showlegend: true
+        };
+        
+        const tracesWithTieLine = [...baseTraces, tieLineTrace];
+        const currentLayout = plotContainer.layout;
+
+        Plotly.react(plotContainer, tracesWithTieLine, currentLayout, {responsive: true});
+    }
+
+    // Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+        // T* values are disabled but set for internal context
+        if (t1BpEl && t2BpEl) {
+            t1BpEl.value = 90; 
+            t2BpEl.value = 120;
+        } 
+        
+        updatePlot();
+    });
+
+</script>
+</body>
+</html>
