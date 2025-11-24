@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Chemical Kinetics - Fixed Analysis</title>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --border: #3e3e42;
+            --text: #d4d4d4;
+            --accent: #007acc;
+            --card-bg: #2d2d30;
+            --input-bg: #3c3c3c;
+            --species-bg: #2b2b2b;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Layout */
+        .main-area { display: flex; flex: 1; height: 100%; }
+        .sidebar {
+            width: 300px;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            padding: 15px; gap: 15px; z-index: 20; overflow-y: auto;
+        }
+        .workspace { flex: 1; display: flex; flex-direction: column; position: relative; }
+        .canvas-wrapper { position: relative; flex: 1; background: #181818; overflow: hidden; border-bottom: 1px solid var(--border); }
+        #nodeLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        /* --- NODES (Common) --- */
+        .node-base {
+            position: absolute; pointer-events: all;
+            display: flex; flex-direction: column;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+        .node-header {
+            padding: 5px 8px; font-weight: bold; cursor: grab;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #555;
+            border-radius: 6px 6px 0 0;
+        }
+        .node-header:active { cursor: grabbing; }
+        .node-close { cursor: pointer; margin-left:8px;} .node-close:hover { color: #ff6b6b; }
+        .node-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+        /* Species Card Specifics */
+        .sp-card {
+            background: var(--species-bg);
+            border: 2px solid #555;
+            width: 140px;
+        }
+        .sp-header { background: #333; color: #fff; }
+        
+        /* Reaction Card Specifics */
+        .rxn-card {
+            background: var(--card-bg);
+            border: 1px solid #777;
+            width: 240px; 
+        }
+        .rxn-header { background: #444; color: #ddd; }
+
+        /* Ports */
+        .port {
+            position: absolute; width: 14px; height: 14px;
+            background: #777; border: 2px solid #fff; border-radius: 50%;
+            top: 50%; transform: translateY(-50%);
+            cursor: crosshair; pointer-events: all; z-index: 10;
+        }
+        .port:hover { background: var(--accent); transform: translateY(-50%) scale(1.3); }
+        .port-left { left: -9px; }
+        .port-right { right: -9px; }
+
+        /* Form Inputs */
+        input[type="number"], input[type="text"], select {
+            background: var(--input-bg); border: 1px solid #555;
+            color: white; border-radius: 3px; padding: 3px;
+            font-size: 0.75rem; width: 100%;
+        }
+        input[type="number"] { width: 50px; }
+        input[type="color"] { border: none; width: 100%; height: 20px; padding: 0; background: none; cursor: pointer; }
+        
+        .row { display: flex; align-items: center; gap: 5px; }
+        .label-sm { font-size: 0.7rem; color: #aaa; flex:1; }
+        .header-row { display: flex; align-items: center; gap: 5px; border-bottom: 1px solid #555; margin-bottom: 2px; padding-bottom: 2px; }
+        .col-header { font-size: 0.65rem; color: #888; text-align: center; }
+
+        /* Rate Law Panel */
+        .rate-law-panel {
+            background: rgba(0,0,0,0.2); padding: 10px;
+            border-radius: 4px; border: 1px solid #444;
+        }
+        .rl-output {
+            font-family: 'Consolas', monospace; font-size: 0.85rem;
+            color: #4ec9b0; background: #111; padding: 8px;
+            border-radius: 3px; border: 1px solid #333;
+            min-height: 1.5em; margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .checkbox-list { max-height: 80px; overflow-y: auto; background: var(--input-bg); padding: 5px; margin-bottom: 5px;}
+        .cb-item { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
+        
+        /* Graph */
+        .graph-wrapper { height: 200px; background: #fff; position: relative; }
+        
+        /* Buttons */
+        button {
+            background: var(--border); color: white; border: none; padding: 6px 10px;
+            border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+        }
+        button:hover { background: var(--accent); }
+        button.active { background: var(--accent); }
+        button.primary { background: var(--accent); width:100%; margin-top:5px;}
+        button.danger { background: #b74b4b; }
+        
+        h2 { margin: 0 0 10px 0; font-size: 1rem; border-bottom: 1px solid #444; padding-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="main-area">
+        <div class="sidebar">
+            
+            <!-- PRESETS -->
+            <h2>Scenarios</h2>
+            <select id="presetSelect" onchange="app.loadPreset(this.value)" style="margin-bottom:15px; padding:6px;">
+                <option value="">-- Load Preset --</option>
+                <option value="1">1. A → B</option>
+                <option value="2">2. A + B → C</option>
+                <option value="3">3. A → B → C</option>
+                <option value="4">4. A ⇌ B (Fast), B + C → D (Slow)</option>
+                <option value="5">5. A + B → C → D</option>
+                <option value="6">6. Complex Cycle (A+B→C...)</option>
+            </select>
+
+            <h2>Toolbar</h2>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button style="flex:1" onclick="app.addSpecies()">+ Species</button>
+                <button style="flex:1" onclick="app.addReaction()">+ Reaction</button>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button id="playBtn" style="flex:1" onclick="app.toggleSim()">Play</button>
+                <button style="flex:1" onclick="app.resetSim()">Reset</button>
+            </div>
+            <button class="danger" style="width:100%" onclick="app.clearAll()">Clear All</button>
+
+            <!-- ANALYSIS -->
+            <div class="rate-law-panel" style="margin-top:15px;">
+                <h2>Rate Law Analysis</h2>
+                <div style="font-size:0.7rem; color:#888; margin-bottom:8px;">
+                    Run simulation, then pick a time point to analyze effective order.
+                </div>
+                
+                <div class="row" style="margin-bottom:5px;">
+                    <span class="label-sm">Analysis Time:</span>
+                    <input type="number" id="analysisTime" value="0.5" step="0.1" style="width:60px">
+                </div>
+                
+                <span class="label-sm">Target Product:</span>
+                <select id="rlTargetSelect"></select>
+                
+                <span class="label-sm">Reactants:</span>
+                <div id="rlCheckboxes" class="checkbox-list"></div>
+
+                <button class="primary" onclick="app.runWindowedAnalysis()">Analyze at Time T</button>
+
+                <div id="rlOutput" class="rl-output">...</div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div style="margin-top:auto">
+                <h2>Settings</h2>
+                <div class="row">
+                    <span class="label-sm">dt (Time Step)</span>
+                    <input type="number" id="timeStep" value="0.001" step="0.001">
+                </div>
+                <div class="row">
+                    <span class="label-sm">Max T</span>
+                    <input type="number" id="maxTime" value="10" step="1">
+                </div>
+                <div class="row">
+                    <span class="label-sm">Speed</span>
+                    <input type="range" id="simSpeed" min="1" max="50" value="10" style="flex:1">
+                </div>
+            </div>
+        </div>
+
+        <div class="workspace">
+            <div class="canvas-wrapper" id="editorContainer">
+                <div style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.6); padding:5px; border-radius:4px; pointer-events:none; color:#fff; font-family:monospace; z-index:100">
+                    Time: <span id="timeDisplay">0.00</span>
+                </div>
+                <canvas id="editorCanvas"></canvas>
+                <div id="nodeLayer"></div>
+            </div>
+            <div class="graph-wrapper" id="graphContainer">
+                <canvas id="graphCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class App {
+            constructor() {
+                this.canvas = document.getElementById('editorCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.gCanvas = document.getElementById('graphCanvas');
+                this.gCtx = this.gCanvas.getContext('2d');
+                this.nodeLayer = document.getElementById('nodeLayer');
+
+                this.nodes = []; 
+                this.reactions = []; 
+                this.links = []; 
+
+                this.time = 0;
+                this.history = [];
+                this.isPlaying = false;
+                
+                this.drag = { active: false, item: null, type: null, offX: 0, offY: 0 };
+
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
+                this.canvas.addEventListener('mousedown', e => this.onCanvasDown(e));
+                window.addEventListener('mousemove', e => this.onGlobalMove(e));
+                window.addEventListener('mouseup', e => this.onGlobalUp(e));
+
+                this.loadPreset("4"); // Load the fast eq preset by default for testing
+                requestAnimationFrame(() => this.loop());
+            }
+
+            // --- PRESETS ---
+            loadPreset(val) {
+                this.clearAll();
+                const H = this.canvas.height;
+                const W = this.canvas.width;
+                const CX = W/2; const CY = H/2;
+
+                if(val === "1") { 
+                    const s1 = this.addSpecies(CX-150, CY, "A", 10, "#ff6b6b");
+                    const s2 = this.addSpecies(CX+150, CY, "B", 0, "#4ec9b0");
+                    const r1 = this.addReaction(CX, CY);
+                    this.addLink(s1.id, r1.id, 'input');
+                    this.addLink(r1.id, s2.id, 'output');
+                }
+                else if(val === "2") { 
+                    const s1 = this.addSpecies(CX-200, CY-50, "A", 10, "#ff6b6b");
+                    const s2 = this.addSpecies(CX-200, CY+50, "B", 10, "#3498db");
+                    const s3 = this.addSpecies(CX+200, CY, "C", 0, "#27ae60");
+                    const r1 = this.addReaction(CX, CY);
+                    this.addLink(s1.id, r1.id, 'input');
+                    this.addLink(s2.id, r1.id, 'input');
+                    this.addLink(r1.id, s3.id, 'output');
+                }
+                else if(val === "3") { 
+                    const s1 = this.addSpecies(100, CY, "A", 10, "#ff6b6b");
+                    const s2 = this.addSpecies(W/2, CY, "B", 0, "#f1c40f");
+                    const s3 = this.addSpecies(W-150, CY, "C", 0, "#4ec9b0");
+                    const r1 = this.addReaction(W/3, CY);
+                    const r2 = this.addReaction(W*0.66, CY);
+                    this.addLink(s1.id, r1.id, 'input'); this.addLink(r1.id, s2.id, 'output');
+                    this.addLink(s2.id, r2.id, 'input'); this.addLink(r2.id, s3.id, 'output');
+                }
+                else if(val === "4") { // The Fast Equilibrium Scenario
+                    const s1 = this.addSpecies(100, CY-50, "A", 8.74, "#ff6b6b");
+                    const s2 = this.addSpecies(350, CY-50, "B", 1.31, "#f1c40f");
+                    const s3 = this.addSpecies(350, CY+100, "C", 8.78, "#3498db");
+                    const s4 = this.addSpecies(600, CY, "D", 1.23, "#27ae60");
+                    
+                    // A <-> 2B
+                    const r1 = this.addReaction(225, CY-50); 
+                    r1.k_f = 4.0; r1.k_r = 20.0;
+                    this.updateReactionUI(r1);
+                    
+                    // B + C -> D
+                    const r2 = this.addReaction(475, CY); 
+                    r2.k_f = 0.1;
+                    this.updateReactionUI(r2);
+
+                    this.addLink(s1.id, r1.id, 'input'); 
+                    
+                    const l1 = this.addLink(r1.id, s2.id, 'output');
+                    if(l1) { l1.coeff=2; l1.order=2; } // IMPORTANT: Explicitly set order for reverse
+                    this.updateReactionUI(r1);
+
+                    this.addLink(s2.id, r2.id, 'input'); 
+                    this.addLink(s3.id, r2.id, 'input');
+                    this.addLink(r2.id, s4.id, 'output');
+                }
+                else if(val === "5") { 
+                    const s1 = this.addSpecies(100, CY-50, "A", 10, "#ff6b6b");
+                    const s2 = this.addSpecies(100, CY+50, "B", 10, "#3498db");
+                    const s3 = this.addSpecies(W/2, CY, "C", 0, "#f1c40f");
+                    const s4 = this.addSpecies(W-150, CY, "D", 0, "#27ae60");
+                    const r1 = this.addReaction(250, CY);
+                    const r2 = this.addReaction(W*0.7, CY);
+                    this.addLink(s1.id, r1.id, 'input'); this.addLink(s2.id, r1.id, 'input');
+                    this.addLink(r1.id, s3.id, 'output');
+                    this.addLink(s3.id, r2.id, 'input'); this.addLink(r2.id, s4.id, 'output');
+                }
+                else if(val === "6") { 
+                    const A = this.addSpecies(100, 100, "A", 20, "#ff6b6b");
+                    const B = this.addSpecies(100, 400, "B", 20, "#3498db");
+                    const C = this.addSpecies(300, 250, "C", 0, "#f1c40f");
+                    const D = this.addSpecies(500, 250, "D", 0, "#9b59b6");
+                    const E = this.addSpecies(700, 400, "E", 0, "#e67e22");
+                    const F = this.addSpecies(700, 100, "F", 0, "#2ecc71");
+                    const r1 = this.addReaction(200, 250);
+                    this.addLink(A.id, r1.id, 'input'); this.addLink(B.id, r1.id, 'input'); this.addLink(r1.id, C.id, 'output');
+                    const r2 = this.addReaction(400, 150);
+                    this.addLink(C.id, r2.id, 'input'); this.addLink(A.id, r2.id, 'input'); 
+                    this.addLink(r2.id, F.id, 'output'); this.addLink(r2.id, D.id, 'output');
+                    const r3 = this.addReaction(400, 350);
+                    this.addLink(D.id, r3.id, 'input'); this.addLink(B.id, r3.id, 'input');
+                    this.addLink(r3.id, C.id, 'output'); this.addLink(r3.id, E.id, 'output');
+                    const r4 = this.addReaction(600, 325);
+                    this.addLink(D.id, r4.id, 'input'); this.addLink(E.id, r4.id, 'input');
+                    this.addLink(r4.id, C.id, 'output');
+                }
+                this.updateRateLawUI();
+            }
+
+            // --- ENTITY CREATION ---
+
+            addSpecies(x, y, name, conc, color) {
+                const id = 's_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+                const s = {
+                    id, x: x || 100, y: y || 100,
+                    width: 140, type: 'species',
+                    name: name || 'S',
+                    conc: conc !== undefined ? conc : 0,
+                    initConc: conc !== undefined ? conc : 0,
+                    color: color || '#ff6b6b',
+                    dom: null
+                };
+
+                const card = document.createElement('div');
+                card.className = 'node-base sp-card';
+                card.style.borderColor = s.color;
+                card.style.left = s.x + 'px'; card.style.top = s.y + 'px';
+
+                card.innerHTML = `
+                    <div class="node-header sp-header">
+                        <span id="nm_${id}">${s.name}</span>
+                        <span class="node-close">&times;</span>
+                    </div>
+                    <div class="node-body">
+                        <div class="row">
+                            <span class="label-sm">Conc</span>
+                            <input type="number" id="conc_${id}" value="${s.conc}" step="0.1">
+                        </div>
+                        <div class="row">
+                            <span class="label-sm">Color</span>
+                            <input type="color" id="col_${id}" value="${s.color}">
+                        </div>
+                        <div class="row">
+                            <span class="label-sm">Name</span>
+                            <input type="text" id="in_nm_${id}" value="${s.name}">
+                        </div>
+                    </div>
+                `;
+
+                card.querySelector('.node-close').onclick = (e) => { e.stopPropagation(); this.deleteSpecies(id); };
+                card.querySelector('.node-header').onmousedown = (e) => {
+                    this.drag = { active: true, type: 'node', item: s, offX: e.clientX - s.x, offY: e.clientY - s.y };
+                    e.stopPropagation();
+                };
+                card.querySelector(`#conc_${id}`).oninput = (e) => { s.initConc = parseFloat(e.target.value); if(this.time===0) s.conc=s.initConc; this.renderCanvas(); };
+                card.querySelector(`#col_${id}`).oninput = (e) => { s.color = e.target.value; card.style.borderColor = s.color; this.renderCanvas(); };
+                card.querySelector(`#in_nm_${id}`).oninput = (e) => { s.name = e.target.value; card.querySelector(`#nm_${id}`).innerText = s.name; this.updateRateLawUI(); };
+
+                this.nodeLayer.appendChild(card);
+                s.dom = card;
+                this.nodes.push(s);
+                this.updateRateLawUI();
+                return s;
+            }
+
+            addReaction(x, y) {
+                const id = 'r_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+                const r = {
+                    id, x: x || 300, y: y || 100, 
+                    width: 240, type: 'reaction',
+                    k_f: 0.1, k_r: 0.0,
+                    dom: null, portLeft: null, portRight: null
+                };
+                
+                const card = document.createElement('div');
+                card.className = 'node-base rxn-card';
+                card.style.left = r.x + 'px'; card.style.top = r.y + 'px';
+                
+                const header = document.createElement('div');
+                header.className = 'node-header rxn-header';
+                header.innerHTML = `<span>Reaction</span><span class="node-close">&times;</span>`;
+                header.querySelector('.node-close').onclick = (e) => { e.stopPropagation(); this.deleteReaction(id); };
+                header.onmousedown = (e) => {
+                    this.drag = { active: true, type: 'node', item: r, offX: e.clientX - r.x, offY: e.clientY - r.y };
+                    e.stopPropagation();
+                };
+
+                const pLeft = document.createElement('div'); pLeft.className = 'port port-left';
+                pLeft.onmousedown = (e) => this.startPortDrag(e, r, 'input');
+
+                const pRight = document.createElement('div'); pRight.className = 'port port-right';
+                pRight.onmousedown = (e) => this.startPortDrag(e, r, 'output');
+
+                const body = document.createElement('div'); body.className = 'node-body'; body.id = `body_${id}`;
+
+                card.append(pLeft, pRight, header, body);
+                this.nodeLayer.appendChild(card);
+                
+                r.dom = card; r.portLeft = pLeft; r.portRight = pRight;
+                this.reactions.push(r);
+                this.updateReactionUI(r);
+                return r;
+            }
+
+            addLink(fromId, toId, type) {
+                if(this.links.find(l => (l.from===fromId && l.to===toId) || (l.from===toId && l.to===fromId))) return null;
+                const id = 'l_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+                let link = { id, from: fromId, to: toId, coeff: 1, order: 1 };
+                this.links.push(link);
+                const rId = (type === 'input') ? toId : fromId;
+                const r = this.reactions.find(x => x.id === rId);
+                if(r) this.updateReactionUI(r);
+                this.renderCanvas();
+                return link;
+            }
+
+            // --- DRAG ---
+            onCanvasDown(e) {}
+            startPortDrag(e, rxn, portType) {
+                e.stopPropagation(); e.preventDefault();
+                const rect = (portType === 'input' ? rxn.portLeft : rxn.portRight).getBoundingClientRect();
+                const c = this.canvas.getBoundingClientRect();
+                this.drag = { active: true, type: 'port-link', item: rxn, portType: portType, 
+                    startX: rect.left - c.left + 7, startY: rect.top - c.top + 7, curX: 0, curY: 0 };
+                this.drag.curX = this.drag.startX; this.drag.curY = this.drag.startY;
+            }
+            onGlobalMove(e) {
+                if(!this.drag.active) return;
+                const cRect = this.canvas.getBoundingClientRect();
+                if(this.drag.type === 'node') {
+                    const conRect = document.getElementById('editorContainer').getBoundingClientRect();
+                    const n = this.drag.item;
+                    n.x = e.clientX - conRect.left - this.drag.offX; 
+                    n.y = e.clientY - conRect.top - this.drag.offY;
+                    n.dom.style.left = n.x + 'px'; n.dom.style.top = n.y + 'px';
+                    this.renderCanvas();
+                } else if(this.drag.type === 'port-link') {
+                    this.drag.curX = e.clientX - cRect.left; this.drag.curY = e.clientY - cRect.top;
+                    this.renderCanvas();
+                }
+            }
+            onGlobalUp(e) {
+                if(!this.drag.active) return;
+                const cRect = this.canvas.getBoundingClientRect();
+                const mx = e.clientX - cRect.left; const my = e.clientY - cRect.top;
+                if(this.drag.type === 'port-link') {
+                    const fromRxn = this.drag.item;
+                    for(let s of this.nodes) {
+                        const sx = s.x, sy = s.y, sw = s.width, sh = s.dom.offsetHeight;
+                        if(mx > sx && mx < sx+sw && my > sy && my < sy+sh) {
+                            if(this.drag.portType === 'input') this.addLink(s.id, fromRxn.id, 'input');
+                            else this.addLink(fromRxn.id, s.id, 'output');
+                        }
+                    }
+                }
+                this.drag.active = false; this.renderCanvas();
+            }
+
+            // --- UI UPDATES ---
+            updateReactionUI(r) {
+                const body = document.getElementById(`body_${r.id}`);
+                if(!body) return;
+                const inputs = this.links.filter(l => l.to === r.id);
+                const outputs = this.links.filter(l => l.from === r.id);
+                let html = ``;
+
+                if(inputs.length > 0) {
+                    html += `<div class="header-row"><span class="label-sm" style="flex:2">Reactants</span><span class="col-header" style="flex:1">Coeff</span><span class="col-header" style="flex:1">Ord</span><span style="width:15px"></span></div>`;
+                    inputs.forEach(l => {
+                        const s = this.nodes.find(n => n.id === l.from);
+                        html += `<div class="row"><span class="label-sm" style="color:${s.color}; flex:2; overflow:hidden">${s.name}</span>
+                            <input type="number" value="${l.coeff}" step="0.5" oninput="app.updateLink('${l.id}','coeff',this.value)" style="flex:1">
+                            <input type="number" value="${l.order}" step="0.1" oninput="app.updateLink('${l.id}','order',this.value)" style="flex:1">
+                            <span style="cursor:pointer;color:#777; width:15px; text-align:center" onclick="app.deleteLink('${l.id}')">&times;</span></div>`;
+                    });
+                }
+
+                html += `<div class="row" style="margin-top:5px; gap:2px">
+                    <div style="flex:1"><span class="label-sm">k_f</span><input type="number" value="${r.k_f}" step="0.1" oninput="app.updateRxn('${r.id}','k_f',this.value)"></div>
+                    <div style="flex:1"><span class="label-sm">k_r</span><input type="number" value="${r.k_r}" step="0.1" oninput="app.updateRxn('${r.id}','k_r',this.value)"></div>
+                </div>`;
+
+                if(outputs.length > 0) {
+                    html += `<div class="header-row" style="margin-top:5px"><span class="label-sm" style="flex:2">Products</span><span class="col-header" style="flex:1">Coeff</span><span class="col-header" style="flex:1">Ord</span><span style="width:15px"></span></div>`;
+                    outputs.forEach(l => {
+                        const s = this.nodes.find(n => n.id === l.to);
+                        html += `<div class="row"><span class="label-sm" style="color:${s.color}; flex:2; overflow:hidden">${s.name}</span>
+                            <input type="number" value="${l.coeff}" step="0.5" oninput="app.updateLink('${l.id}','coeff',this.value)" style="flex:1">
+                            <input type="number" value="${l.order}" step="0.1" oninput="app.updateLink('${l.id}','order',this.value)" style="flex:1">
+                            <span style="cursor:pointer;color:#777; width:15px; text-align:center" onclick="app.deleteLink('${l.id}')">&times;</span></div>`;
+                    });
+                }
+                body.innerHTML = html;
+            }
+
+            updateLink(id, key, val) { const l = this.links.find(x => x.id === id); if(l) l[key] = parseFloat(val); }
+            updateRxn(id, key, val) { const r = this.reactions.find(x => x.id === id); if(r) r[key] = parseFloat(val); }
+
+            updateRateLawUI() {
+                const targetSelect = document.getElementById('rlTargetSelect');
+                const checkBoxContainer = document.getElementById('rlCheckboxes');
+                const currentTarget = targetSelect.value;
+                const currentChecks = Array.from(checkBoxContainer.querySelectorAll('input')).filter(i => i.checked).map(i => i.value);
+
+                targetSelect.innerHTML = ''; checkBoxContainer.innerHTML = '';
+                this.nodes.forEach(n => {
+                    const opt = document.createElement('option'); opt.value = n.id; opt.innerText = n.name;
+                    targetSelect.appendChild(opt);
+
+                    const div = document.createElement('div'); div.className = 'cb-item';
+                    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = n.id;
+                    const isLinked = this.links.some(l => (l.from === n.id));
+                    if(currentChecks.includes(n.id) || (currentChecks.length===0 && isLinked)) cb.checked = true;
+
+                    const span = document.createElement('span'); span.innerText = n.name; span.style.color = n.color;
+                    div.append(cb, span); checkBoxContainer.appendChild(div);
+                });
+                if(currentTarget && this.nodes.find(n=>n.id===currentTarget)) targetSelect.value = currentTarget;
+            }
+
+            // --- ANALYSIS (WINDOWED) ---
+
+            runWindowedAnalysis() {
+                const targetId = document.getElementById('rlTargetSelect').value;
+                const inputs = Array.from(document.querySelectorAll('#rlCheckboxes input:checked')).map(cb => this.nodes.find(n => n.id === cb.value));
+                const timePoint = parseFloat(document.getElementById('analysisTime').value);
+                const outDiv = document.getElementById('rlOutput');
+                
+                // FIX 1: Retrieve User dt
+                const userDt = parseFloat(document.getElementById('timeStep').value) || 0.01;
+                
+                if(!targetId || inputs.length === 0) { outDiv.innerText = "Select target & reactants."; return; }
+                if(this.history.length === 0) { outDiv.innerText = "Run simulation first."; return; }
+
+                const snap = this.history.reduce((prev, curr) => Math.abs(curr.t - timePoint) < Math.abs(prev.t - timePoint) ? curr : prev);
+                outDiv.innerText = `Analyzing at T=${snap.t.toFixed(2)}...\n`;
+
+                // FIX 2: Dynamic Steps based on time window (0.5s) and user dt
+                // If dt is very small (0.001), steps will be 500.
+                // If dt is large (0.05), steps will be 10.
+                const simWindow = 0.5; 
+                let steps = Math.ceil(simWindow / userDt);
+                if(steps > 2000) steps = 2000; // Cap for performance if they put dt=0.00001
+                
+                const baseState = {...snap.values};
+
+                const baseResult = this.simulateDryRun(baseState, userDt, steps, targetId);
+                const baseRate = baseResult.rate;
+
+                if(Math.abs(baseRate) < 1e-6) { outDiv.innerText += "Net Rate ≈ 0. Order indeterminate."; return; }
+
+                let equationHtml = `Rate = k'`;
+                let k_denom = 1.0;
+
+                inputs.forEach(species => {
+                    const conc = baseState[species.id];
+                    if(conc < 0.001) { equationHtml += ` [${species.name}]^(?)`; } else {
+                        const expState = {...baseState};
+                        expState[species.id] = conc * 2.0;
+
+                        const expResult = this.simulateDryRun(expState, userDt, steps, targetId);
+                        const expRate = expResult.rate;
+                        let order = Math.log2(Math.abs(expRate / baseRate));
+
+                        if(Math.abs(order - Math.round(order)) < 0.1) order = Math.round(order);
+                        else if(Math.abs(order - (Math.floor(order)+0.5)) < 0.1) order = Math.floor(order)+0.5;
+
+                        equationHtml += ` [${species.name}]^${order.toFixed(2)}`;
+                        k_denom *= Math.pow(conc, order);
+                    }
+                });
+
+                const k_eff = Math.abs(baseRate) / k_denom;
+                let kStr = k_eff.toFixed(3);
+                if(k_eff < 0.001 && k_eff > 0) kStr = k_eff.toExponential(2);
+                equationHtml = equationHtml.replace("k'", kStr);
+                if(baseRate < 0) equationHtml = "(-)" + equationHtml;
+                outDiv.innerText += equationHtml;
+            }
+
+            simulateDryRun(initialState, dt, steps, targetId) {
+                let state = {...initialState};
+                for(let i=0; i<steps; i++) {
+                    const k1 = this.getDerivatives(state);
+                    const s2 = {}; for(let k in state) s2[k] = state[k] + k1[k]*dt*0.5;
+                    const k2 = this.getDerivatives(s2);
+                    const s3 = {}; for(let k in state) s3[k] = state[k] + k2[k]*dt*0.5;
+                    const k3 = this.getDerivatives(s3);
+                    const s4 = {}; for(let k in state) s4[k] = state[k] + k3[k]*dt;
+                    const k4 = this.getDerivatives(s4);
+                    for(let k in state) { state[k] += (dt/6)*(k1[k] + 2*k2[k] + 2*k3[k] + k4[k]); if(state[k]<0) state[k]=0; }
+                }
+                const finalDerivs = this.getDerivatives(state);
+                return { rate: finalDerivs[targetId], state: state };
+            }
+
+            // --- STANDARD SIM ---
+            deleteSpecies(id) {
+                const s = this.nodes.find(n=>n.id===id);
+                if(s) s.dom.remove();
+                this.nodes = this.nodes.filter(n => n.id !== id);
+                this.links = this.links.filter(l => l.from !== id && l.to !== id);
+                this.renderCanvas(); this.updateRateLawUI();
+            }
+            deleteReaction(id) {
+                const r = this.reactions.find(n=>n.id===id);
+                if(r) r.dom.remove();
+                this.reactions = this.reactions.filter(x => x.id !== id);
+                this.links = this.links.filter(l => l.from !== id && l.to !== id);
+                this.renderCanvas();
+            }
+            deleteLink(id) {
+                const l = this.links.find(x => x.id === id);
+                if(!l) return;
+                const rid = this.reactions.find(r => r.id === l.from || r.id === l.to).id;
+                this.links = this.links.filter(x => x.id !== id);
+                this.updateReactionUI(this.reactions.find(r => r.id === rid));
+                this.renderCanvas();
+            }
+            clearAll() {
+                this.nodes.forEach(n => n.dom.remove()); this.nodes = [];
+                this.reactions.forEach(r => r.dom.remove()); this.reactions = [];
+                this.links = []; this.resetSim(); this.updateRateLawUI();
+            }
+
+            getDerivatives(stateMap) {
+                const dC = {}; this.nodes.forEach(s => dC[s.id] = 0);
+                this.reactions.forEach(r => {
+                    const inputs = this.links.filter(l => l.to === r.id); 
+                    const outputs = this.links.filter(l => l.from === r.id);
+                    let rateF = r.k_f, possibleF = true;
+                    inputs.forEach(l => { const c = Math.max(0, stateMap[l.from]); rateF *= Math.pow(c, l.order); if(c<1e-9) possibleF=false; });
+                    if(!possibleF) rateF=0;
+                    
+                    let rateR = r.k_r, possibleR = true;
+                    if(rateR>0) { outputs.forEach(l => { const c = Math.max(0, stateMap[l.to]); rateR *= Math.pow(c, l.order); if(c<1e-9) possibleR=false; }); }
+                    if(!possibleR) rateR=0;
+                    
+                    const net = rateF - rateR;
+                    inputs.forEach(l => dC[l.from] -= l.coeff * net);
+                    outputs.forEach(l => dC[l.to] += l.coeff * net);
+                });
+                return dC;
+            }
+
+            stepSim(targetDt) {
+                const maxTime = parseFloat(document.getElementById('maxTime').value);
+                if (maxTime > 0 && this.time >= maxTime) { this.isPlaying = false; this.updatePlayBtn(); return; }
+                if (this.nodes.length === 0) return;
+                let dt = targetDt;
+                const curState = {}; this.nodes.forEach(s => curState[s.id] = s.conc);
+                const k1 = this.getDerivatives(curState);
+                const s2 = {}; this.nodes.forEach(s => s2[s.id] = curState[s.id] + k1[s.id]*dt*0.5);
+                const k2 = this.getDerivatives(s2);
+                const s3 = {}; this.nodes.forEach(s => s3[s.id] = curState[s.id] + k2[s.id]*dt*0.5);
+                const k3 = this.getDerivatives(s3);
+                const s4 = {}; this.nodes.forEach(s => s4[s.id] = curState[s.id] + k3[s.id]*dt);
+                const k4 = this.getDerivatives(s4);
+                this.nodes.forEach(s => {
+                    s.conc += (dt/6)*(k1[s.id] + 2*k2[s.id] + 2*k3[s.id] + k4[s.id]);
+                    if(s.conc < 0) s.conc = 0;
+                    if(Math.random() < 0.1) s.dom.querySelector(`#conc_${s.id}`).value = s.conc.toFixed(2);
+                });
+                this.time += dt;
+                const snap = { t: this.time, values: {} };
+                this.nodes.forEach(s => snap.values[s.id] = s.conc);
+                this.history.push(snap);
+                document.getElementById('timeDisplay').innerText = this.time.toFixed(2);
+            }
+
+            toggleSim() { this.isPlaying = !this.isPlaying; this.updatePlayBtn(); }
+            updatePlayBtn() { 
+                const btn = document.getElementById('playBtn'); 
+                btn.innerText = this.isPlaying ? "Pause" : "Play";
+                btn.className = this.isPlaying ? "active" : "";
+            }
+            resetSim() {
+                this.isPlaying = false; this.updatePlayBtn(); this.time = 0; this.history = [];
+                this.nodes.forEach(s => { s.conc = s.initConc; s.dom.querySelector(`#conc_${s.id}`).value=s.conc; });
+                this.renderCanvas(); this.renderGraph();
+                document.getElementById('timeDisplay').innerText = "0.00";
+            }
+            loop() {
+                if(this.isPlaying) {
+                    const dt = parseFloat(document.getElementById('timeStep').value);
+                    const spd = parseInt(document.getElementById('simSpeed').value);
+                    for(let i=0; i<spd; i++) this.stepSim(dt);
+                    this.renderCanvas();
+                }
+                this.renderGraph();
+                requestAnimationFrame(() => this.loop());
+            }
+
+            renderCanvas() {
+                const ctx = this.ctx; ctx.clearRect(0,0, this.canvas.width, this.canvas.height);
+                const conRect = document.getElementById('editorContainer').getBoundingClientRect();
+                const getCenter = (item) => { return { x: item.x + (item.dom.offsetWidth/2), y: item.y + (item.dom.offsetHeight/2) }; };
+                const getPortPos = (rxn, type) => {
+                    const el = type === 'input' ? rxn.portLeft : rxn.portRight;
+                    const r = el.getBoundingClientRect();
+                    return { x: r.left - conRect.left + 7, y: r.top - conRect.top + 7 };
+                };
+
+                this.links.forEach(l => {
+                    const species = this.nodes.find(n => n.id === l.from || n.id === l.to);
+                    const rxn = this.reactions.find(r => r.id === l.from || r.id === l.to);
+                    if(!species || !rxn) return;
+                    const spC = getCenter(species);
+                    let start, end;
+                    if(l.from === species.id) { start = spC; end = getPortPos(rxn, 'input'); }
+                    else { start = getPortPos(rxn, 'output'); end = spC; }
+
+                    ctx.beginPath(); ctx.moveTo(start.x, start.y);
+                    const cp1 = { x: (start.x + end.x)/2, y: start.y };
+                    const cp2 = { x: (start.x + end.x)/2, y: end.y };
+                    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+                    ctx.strokeStyle = '#666'; ctx.lineWidth = 2; ctx.stroke();
+                    const angle = Math.atan2(end.y - cp2.y, end.x - cp2.x);
+                    const pad = (l.to === species.id) ? (species.width/2) : 5;
+                    const ax = end.x - Math.cos(angle)*pad; const ay = end.y - Math.sin(angle)*pad;
+                    ctx.beginPath(); ctx.moveTo(ax, ay);
+                    ctx.lineTo(ax - 10*Math.cos(angle-Math.PI/6), ay - 10*Math.sin(angle-Math.PI/6));
+                    ctx.lineTo(ax - 10*Math.cos(angle+Math.PI/6), ay - 10*Math.sin(angle+Math.PI/6));
+                    ctx.fillStyle = '#888'; ctx.fill();
+                });
+                if(this.drag.active && this.drag.type === 'port-link') {
+                    ctx.beginPath(); ctx.moveTo(this.drag.startX, this.drag.startY); 
+                    ctx.lineTo(this.drag.curX, this.drag.curY);
+                    ctx.strokeStyle = '#fff'; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+            }
+
+            renderGraph() {
+                const ctx = this.gCtx; const w = this.gCanvas.width; const h = this.gCanvas.height;
+                ctx.clearRect(0,0,w,h);
+                if(this.history.length < 2) return;
+                let maxC = 0; this.history.forEach(s => Object.values(s.values).forEach(v => { if(v>maxC) maxC=v; }));
+                if(maxC===0) maxC=1; else maxC*=1.1;
+                const maxT = Math.max(parseFloat(document.getElementById('maxTime').value)||100, this.time);
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(40,h-20); ctx.lineTo(w,h-20); ctx.moveTo(40,0); ctx.lineTo(40,h-20); ctx.stroke();
+                this.nodes.forEach(s => {
+                    ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+                    let step = Math.ceil(this.history.length / w);
+                    let started = false;
+                    for(let i=0; i<this.history.length; i+=step) {
+                        const snap = this.history[i];
+                        const x = 40 + (snap.t / maxT) * (w - 50);
+                        const y = (h-20) - (snap.values[s.id] / maxC) * (h-30);
+                        if(!started) { ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
+                    }
+                    ctx.stroke();
+                });
+            }
+            resize() {
+                const cw = document.getElementById('editorContainer');
+                this.canvas.width = cw.clientWidth; this.canvas.height = cw.clientHeight;
+                const gw = document.getElementById('graphContainer');
+                this.gCanvas.width = gw.clientWidth; this.gCanvas.height = gw.clientHeight;
+                this.renderCanvas(); this.renderGraph();
+            }
+        }
+        const app = new App();
+    </script>
+</body>
+</html>
