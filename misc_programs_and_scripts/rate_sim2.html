@@ -232,7 +232,10 @@
                 this.history = [];
                 this.isPlaying = false;
                 
-                this.drag = { active: false, item: null, type: null, offX: 0, offY: 0 };
+                // FIXED: drag object structure to support delta dragging
+                // startX/startY: initial mouse pos
+                // origX/origY: initial node pos
+                this.drag = { active: false, item: null, type: null, startX: 0, startY: 0, origX: 0, origY: 0 };
 
                 this.resize();
                 window.addEventListener('resize', () => this.resize());
@@ -377,10 +380,21 @@
                 `;
 
                 card.querySelector('.node-close').onclick = (e) => { e.stopPropagation(); this.deleteSpecies(id); };
+                
+                // FIX: Use Delta Dragging
                 card.querySelector('.node-header').onmousedown = (e) => {
-                    this.drag = { active: true, type: 'node', item: s, offX: e.clientX - s.x, offY: e.clientY - s.y };
                     e.stopPropagation();
+                    this.drag = { 
+                        active: true, 
+                        type: 'node', 
+                        item: s, 
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        origX: s.x, 
+                        origY: s.y 
+                    };
                 };
+                
                 card.querySelector(`#conc_${id}`).oninput = (e) => { s.initConc = parseFloat(e.target.value); if(this.time===0) s.conc=s.initConc; this.renderCanvas(); };
                 card.querySelector(`#col_${id}`).oninput = (e) => { s.color = e.target.value; card.style.borderColor = s.color; this.renderCanvas(); };
                 card.querySelector(`#in_nm_${id}`).oninput = (e) => { s.name = e.target.value; card.querySelector(`#nm_${id}`).innerText = s.name; this.updateRateLawUI(); };
@@ -409,9 +423,19 @@
                 header.className = 'node-header rxn-header';
                 header.innerHTML = `<span>Reaction</span><span class="node-close">&times;</span>`;
                 header.querySelector('.node-close').onclick = (e) => { e.stopPropagation(); this.deleteReaction(id); };
+                
+                // FIX: Use Delta Dragging
                 header.onmousedown = (e) => {
-                    this.drag = { active: true, type: 'node', item: r, offX: e.clientX - r.x, offY: e.clientY - r.y };
                     e.stopPropagation();
+                    this.drag = { 
+                        active: true, 
+                        type: 'node', 
+                        item: r, 
+                        startX: e.clientX, 
+                        startY: e.clientY,
+                        origX: r.x, 
+                        origY: r.y 
+                    };
                 };
 
                 const pLeft = document.createElement('div'); pLeft.className = 'port port-left';
@@ -449,6 +473,7 @@
                 e.stopPropagation(); e.preventDefault();
                 const rect = (portType === 'input' ? rxn.portLeft : rxn.portRight).getBoundingClientRect();
                 const c = this.canvas.getBoundingClientRect();
+                // For port drag, startX/startY represent the Anchor Point on the canvas, not the mouse
                 this.drag = { active: true, type: 'port-link', item: rxn, portType: portType, 
                     startX: rect.left - c.left + 7, startY: rect.top - c.top + 7, curX: 0, curY: 0 };
                 this.drag.curX = this.drag.startX; this.drag.curY = this.drag.startY;
@@ -456,14 +481,18 @@
             onGlobalMove(e) {
                 if(!this.drag.active) return;
                 const cRect = this.canvas.getBoundingClientRect();
+                
                 if(this.drag.type === 'node') {
-                    const conRect = document.getElementById('editorContainer').getBoundingClientRect();
+                    // FIX: Delta Logic for Node Drag
+                    const dx = e.clientX - this.drag.startX;
+                    const dy = e.clientY - this.drag.startY;
                     const n = this.drag.item;
-                    n.x = e.clientX - conRect.left - this.drag.offX; 
-                    n.y = e.clientY - conRect.top - this.drag.offY;
+                    n.x = this.drag.origX + dx;
+                    n.y = this.drag.origY + dy;
                     n.dom.style.left = n.x + 'px'; n.dom.style.top = n.y + 'px';
                     this.renderCanvas();
-                } else if(this.drag.type === 'port-link') {
+                } 
+                else if(this.drag.type === 'port-link') {
                     this.drag.curX = e.clientX - cRect.left; this.drag.curY = e.clientY - cRect.top;
                     this.renderCanvas();
                 }
@@ -555,7 +584,6 @@
                 const timePoint = parseFloat(document.getElementById('analysisTime').value);
                 const outDiv = document.getElementById('rlOutput');
                 
-                // FIX 1: Retrieve User dt
                 const userDt = parseFloat(document.getElementById('timeStep').value) || 0.01;
                 
                 if(!targetId || inputs.length === 0) { outDiv.innerText = "Select target & reactants."; return; }
@@ -564,12 +592,9 @@
                 const snap = this.history.reduce((prev, curr) => Math.abs(curr.t - timePoint) < Math.abs(prev.t - timePoint) ? curr : prev);
                 outDiv.innerText = `Analyzing at T=${snap.t.toFixed(2)}...\n`;
 
-                // FIX 2: Dynamic Steps based on time window (0.5s) and user dt
-                // If dt is very small (0.001), steps will be 500.
-                // If dt is large (0.05), steps will be 10.
                 const simWindow = 0.5; 
                 let steps = Math.ceil(simWindow / userDt);
-                if(steps > 2000) steps = 2000; // Cap for performance if they put dt=0.00001
+                if(steps > 2000) steps = 2000;
                 
                 const baseState = {...snap.values};
 
