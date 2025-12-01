@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Supabase Report Test</title>
+  <style>
+    /* ... All styles are unchanged from the previous version ... */
+    body { font-family: sans-serif; line-height: 1.6; padding: 1em; }
+    #reportSection h4, .report-details h5 { margin-top: 2em; border-bottom: 1px solid #ccc; padding-bottom: 5px; color: #333; }
+    .form-entry { margin-bottom: 1.5em; padding: 15px; border: 1px solid #eee; border-radius: 5px; background-color: #fcfcfc; }
+    input[type="text"], input[type="email"], input[type="password"], select, textarea { width: 95%; max-width: 600px; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; }
+    textarea { height: 60px; }
+    button { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: 1px solid #777; background-color: #f0f0f0; }
+    button:hover { background-color: #e0e0e0; }
+    #saveReportBtn { background-color: #28a745; color: white; border-color: #28a745; }
+    #signOutBtn { background-color: #dc3545; color: white; border-color: #dc3545; }
+    .radio-group { margin: 5px 0; }
+    .radio-group label { margin-right: 15px; font-weight: normal; }
+    #output { background-color: #222; color: #0f0; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+    .report-summary-item { border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; background: #f9f9f9; }
+    .report-header { padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .report-header:hover { background-color: #efefef; }
+    .report-details { padding: 0 15px 15px 15px; border-top: 1px solid #ddd; display: none; }
+    .detail-entry { margin-top: 1em; padding-top: 1em; border-top: 1px dashed #ccc; }
+    .detail-rating { font-weight: bold; padding: 2px 8px; border-radius: 10px; color: white; }
+    .rating-Acceptable { background-color: #28a745; }
+    .rating-Deficient { background-color: #dc3545; }
+    .rating-NotObserved { background-color: #6c757d; }
+    .rating-NotApplicable { background-color: #17a2b8; }
+    .detail-comments { background: #fffde7; padding: 10px; border-left: 3px solid #ffc107; margin: 10px 0; white-space: pre-wrap; }
+    .detail-images img { max-width: 150px; max-height: 150px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+    #submitReportBtn {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+    #submitReportBtn:hover {
+      background-color: #0056b3;
+    }
+    .link-button {
+      background: none;
+      border: none;
+      color: #007bff;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+    }
+ #userCorrectiveActionsSection {
+        margin-bottom: 2em;
+        padding: 1em;
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        border-radius: 5px;
+    }
+    .modal {
+        display: none; /* Hidden by default */
+        position: fixed; z-index: 1000; left: 0; top: 0;
+        width: 100%; height: 100%;
+        overflow: auto; background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: 15% auto; padding: 20px;
+        border: 1px solid #888; width: 80%; max-width: 500px;
+        border-radius: 5px;
+    }
+    .close-button {
+        color: #aaa; float: right; font-size: 28px; font-weight: bold;
+    }
+    .close-button:hover, .close-button:focus {
+        color: black; text-decoration: none; cursor: pointer;
+    }
+    .image-previews {
+        margin-top: 10px;
+    }
+    .preview-thumbnail {
+        width: 60px;
+        height: 60px;
+        object-fit: cover; /* Ensures images are not distorted */
+        margin: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .preview-thumbnail:hover {
+        transform: scale(1.1);
+    }
+    .image-modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 1000;
+        padding-top: 60px;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.9);
+    }
+    .modal-content-image {
+        margin: auto;
+        display: block;
+        max-width: 80%;
+        max-height: 80%;
+    }
+    .modal-close {
+        position: absolute;
+        top: 15px;
+        right: 35px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        transition: 0.3s;
+        cursor: pointer;
+    }
+    .modal-close:hover,
+    .modal-close:focus {
+        color: #bbb;
+        text-decoration: none;
+    }
+    .previous-comments-display {
+    background: #f1f1f1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    white-space: pre-wrap; /* This preserves line breaks */
+    font-size: 0.9em;
+    color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h2>Supabase Test: Sign In & Manage Reports</h2>
+
+  <div id="authSection">
+    <input type="email" id="emailInput" placeholder="Email" />
+    <input type="password" id="passwordInput" placeholder="Password" />
+    <button id="signUpBtn">Sign Up</button>
+    <button id="signInBtn">Sign In</button>
+  </div>
+  <button id="signOutBtn" style="display: none;">Sign Out</button>
+
+<!-- REPLACED FILTER CONTAINER -->
+  <div id="filterContainer" style="display: none; margin-bottom: 1em; padding: 15px; background-color: #f0f8ff; border: 1px solid #cce5ff; border-radius: 5px;">
+      <strong style="margin-right: 15px;">Filter View:</strong>
+      
+      <label style="margin-right: 15px; cursor: pointer;">
+          <input type="checkbox" class="filter-cb" value="Deficient"> Deficient
+      </label>
+      
+      <label style="margin-right: 15px; cursor: pointer;">
+          <input type="checkbox" class="filter-cb" value="Acceptable"> Acceptable
+      </label>
+      
+      <label style="margin-right: 15px; cursor: pointer;">
+          <input type="checkbox" class="filter-cb" value="NotObserved"> Not Observed
+      </label>
+      
+      <label style="margin-right: 15px; cursor: pointer;">
+          <input type="checkbox" class="filter-cb" value="NotApplicable"> N/A
+      </label>
+      
+      <span style="border-left: 1px solid #ccc; margin-right: 15px;"></span>
+      
+      <label style="margin-right: 15px; cursor: pointer;">
+          <input type="checkbox" class="filter-cb" value="HasComments"> Has Comments
+      </label>
+      
+      <label style="margin-right: 15px; cursor: pointer;">
+          <input type="checkbox" class="filter-cb" value="HasImages"> Has Pictures
+      </label>
+
+      <div style="margin-top: 5px; font-size: 0.85em; color: #666;">
+          * Leave all unchecked to show everything. Checking boxes shows items matching <strong>any</strong> selected criteria.
+      </div>
+  </div>
+
+<div id="reportSection" style="display: none;">
+    <!-- 1. Lists of existing items (Drafts, Corrective Actions, History) -->
+    <div id="userCorrectiveActionsSection" style="display: none;"></div>
+    <div id="userDraftsSection" style="display: none;"></div>
+    <div id="userSubmittedSection" style="display: none; margin-bottom: 2em;"></div>
+
+    <!-- 2. The button to start a new form -->
+    <div id="startReportControls" style="margin-bottom: 20px;">
+        <button id="startNewReportBtn" style="background-color: #28a745; color: white; padding: 12px 20px; font-size: 1.1em;">+ Start New Report</button>
+    </div>
+    
+    <!-- 3. The Actual Form (Hidden by default) -->
+    <div id="activeFormContainer" style="display: none; border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #fff;">
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+            <h3>Create or Edit Report</h3>
+            <button id="cancelFormBtn" style="background-color: #6c757d; color: white;">Cancel / Close</button>
+        </div>
+        
+        <input type="hidden" id="editReportId" />
+        
+        <!-- Title and Description -->
+        <div style="margin-bottom: 10px;">
+            <input type="text" id="titleInput" placeholder="Report Title" style="display: block; width: 100%; box-sizing: border-box;" />
+        </div>
+        <div style="margin-bottom: 10px;">
+            <textarea id="descriptionInput" placeholder="Overall Description/Notes" style="display: block; width: 100%; box-sizing: border-box; height: 80px;"></textarea>
+        </div>
+
+        <div id="inspection-form-container"></div>
+        
+        <!-- Action Buttons -->
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+            <button id="saveDraftBtn">Save Draft</button>
+            <button id="submitReportBtn">Submit Report</button>
+            <button id="saveReviewBtn" style="display: none;">Save Review</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="adminSection" style="display: none;">
+    <h3>Admin Dashboard</h3>
+    <button id="showCreateFormBtn">Create New Report</button>
+
+    <hr>
+    <h4>Active Reports</h4>
+    <div id="reportsList"></div>
+    
+    <hr style="margin: 2em 0;">
+
+    <h4>History (Passed Reports)</h4>
+    <div id="historyReportsList"></div>
+  </div>
+
+  <div id="assignModal" class="modal">
+    <div class="modal-content">
+      <span class="close-button" onclick="closeAssignModal()">&times;</span>
+      <h3>Assign Corrective Action</h3>
+      <p>Select a user to assign this report to. A complete copy of the report, including images, will be created for them to edit.</p>
+      <input type="hidden" id="reportToAssignId">
+      <select id="userSelect" style="width: 100%; padding: 8px;"></select>
+      <br><br>
+      <button id="confirmAssignBtn">Confirm Assignment</button>
+    </div>
+  </div>
+
+  <div id="imageModal" class="image-modal">
+    <span class="modal-close" onclick="closeImageModal()">&times;</span>
+    <img class="modal-content-image" id="modalImage">
+  </div>
+
+  <pre id="output"></pre>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    const supabaseUrl = "https://abhpqjalptewznfnelwf.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiaHBxamFscHRld3puZm5lbHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyNDM1NzIsImV4cCI6MjA3ODgxOTU3Mn0.Zf4IkSwD1os1xJ2bs7PUOvFaih8Rz0hI_jMghh731Gw";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const BUCKET_NAME = 'report-images';
+
+    // DOM References
+    const userDraftsSection = document.getElementById('userDraftsSection');
+    const filterContainer = document.getElementById('filterContainer');
+    const emailInput = document.getElementById("emailInput"), passwordInput = document.getElementById("passwordInput");
+    const signUpBtn = document.getElementById("signUpBtn"), signInBtn = document.getElementById("signInBtn"), signOutBtn = document.getElementById("signOutBtn");
+    const authSection = document.getElementById("authSection"), reportSection = document.getElementById("reportSection"), adminSection = document.getElementById("adminSection");
+    const titleInput = document.getElementById("titleInput"), descriptionInput = document.getElementById("descriptionInput"), statusInput = document.getElementById("statusInput");
+    const saveReportBtn = document.getElementById("saveReportBtn"), editReportId = document.getElementById("editReportId");
+    const reportsList = document.getElementById("reportsList"), output = document.getElementById("output");
+    const formContainer = document.getElementById("inspection-form-container");
+    const filterToggle = document.getElementById('filterToggle');
+    const showCreateFormBtn = document.getElementById('showCreateFormBtn');
+    const startNewReportBtn = document.getElementById('startNewReportBtn');
+    const activeFormContainer = document.getElementById('activeFormContainer');
+    const cancelFormBtn = document.getElementById('cancelFormBtn');
+    const startReportControls = document.getElementById('startReportControls');
+    let allReportsData = {};
+    let isCurrentUserAdmin = false; 
+    // --- NEW: IMAGE PROCESSING CONFIGURATION & STATE ---
+    const MAX_IMAGE_SIZE_KB = 200;
+    let processedFiles = {}; // Stores files ready for upload, key is the input's ID
+	let currentEditingData = null;
+	let userEmailMap = {};
+
+    const entries = [
+      {category: "Housekeeping", categoryKey: "Housekeeping", key: "Surfaces_cleaned", full: "Surfaces appear to be cleaned and decontaminated after work is performed (no chemical residue, dust, biohazards, etc.)."},
+      {category: "Housekeeping", categoryKey: "Housekeeping", key: "General_workspace", full: "General work space, storage areas, and benchtops appear uncluttered and orderly."},
+      {category: "Housekeeping", categoryKey: "Housekeeping", key: "No_slip_trip", full: "No slip, trip, or fall hazards are present. Aisles and exits are free from obstruction."},
+      {category: "Housekeeping", categoryKey: "Housekeeping", key: "No_glass_floor", full: "No glass containers are stored on the floor."},
+      {category: "Housekeeping", categoryKey: "Housekeeping", key: "Trash_removed", full: "Trash bags & sharps containers are removed when full."},
+      {category: "Personal Protective Equipment (PPE)", categoryKey: "PPE", key: "Hand_protection", full: "Hand protection is available, matched to hazards, and in use."},
+      {category: "Personal Protective Equipment (PPE)", categoryKey: "PPE", key: "Eye_protection", full: "Eye protection is available and in use."},
+      {category: "Personal Protective Equipment (PPE)", categoryKey: "PPE", key: "Lab_coats", full: "Lab coats, Tyvek garments, etc., are available and in use when required."},
+      {category: "Personal Protective Equipment (PPE)", categoryKey: "PPE", key: "Appropriate_attire", full: "Personnel are wearing appropriate attire (no shorts, tank tops, open-toed shoes, etc.)."},
+      {category: "Personal Protective Equipment (PPE)", categoryKey: "PPE", key: "Head_foot_hearing", full: "Head, Foot, Hearing, & Fall protection is available and in use if required."},
+      {category: "Emergency Preparedness", categoryKey: "Emergency", key: "Eye_wash_shower", full: "Eye wash/safety shower in good working order, covers in place, and pathway unobstructed."},
+      {category: "Emergency Preparedness", categoryKey: "Emergency", key: "Eyewash_flushed", full: "Eyewash flushed monthly and date is documented. Personnel are aware of the eyewash/shower location and know how to operate the equipment."},
+      {category: "Emergency Preparedness", categoryKey: "Emergency", key: "Spill_kit", full: "A chemical and/or biological spill kit for minor spills is available."},
+      {category: "Emergency Preparedness", categoryKey: "Emergency", key: "First_aid", full: "First aid medication/antidotes are available and within expiration dates (i.e., calcium gluconate for HF exposure)."},
+      {category: "Emergency Preparedness", categoryKey: "Emergency", key: "Access_electrical", full: "Access to electrical breaker panels and emergency shutoff controls is unobstructed with 3' clearance."},
+      {category: "Emergency Preparedness", categoryKey: "Emergency", key: "Evacuation_routes", full: "Evacuation routes are posted in common hallways. Personnel know the evacuation procedure, meeting site, and location of nearest fire alarm."},
+      {category: "Fire Protection", categoryKey: "Fire", key: "Sprinkler_heads", full: "Sprinkler heads are unobstructed with an 18\" clearance below sprinkler heads around entire room (24\" clearance for non-sprinklered areas)."},
+      {category: "Fire Protection", categoryKey: "Fire", key: "Fire_extinguishers", full: "Fire extinguishers available, appropriate for type of hazard, inspection dates recorded, and unobstructed access with 3-feet clearance."},
+      {category: "General Practice", categoryKey: "General", key: "Caution_signs", full: "Caution signs on the door and equipment for any specific hazards (UV, Laser, Radiation, Biohazard, noise, high voltage, etc.)."},
+      {category: "General Practice", categoryKey: "General", key: "Food_labeled", full: "Food & household products used in chemical or hazard area are labeled \"not for human consumption\" or \"lab use only.\""},
+      {category: "General Practice", categoryKey: "General", key: "Appliances_labeled", full: "Household appliances (refrigerators, microwaves, blenders, grinders, etc.) are labeled for “lab use only.”"},
+      {category: "General Practice", categoryKey: "General", key: "No_eating_drinking", full: "No evidence of eating, drinking, smoking, applying cosmetics, or mouth pipetting inside the space."},
+      {category: "Safety Training", categoryKey: "Training", key: "Hazard_assessment", full: "Hazard Assessment Training Determination Form submitted and current for potential hazards."},
+      {category: "Engineering Controls & Ventilation", categoryKey: "EngControls", key: "CFH_not_storage", full: "Chemical fume hood (CFH) not being used for chemical or equipment storage. Air foil & rear baffle unobstructed. Excess equipment is mounted to aid in air circulation."},
+      {category: "Engineering Controls & Ventilation", categoryKey: "EngControls", key: "CFH_sash", full: "CFH sash is at or below minimum height (18\") when in use and kept closed when not in use."},
+      {category: "Engineering Controls & Ventilation", categoryKey: "EngControls", key: "Access_CFH_LEV", full: "Access to CFH/LEV is unobstructed."},
+      {category: "Engineering Controls & Ventilation", categoryKey: "EngControls", key: "Fume_hood_cert", full: "Fume hood inspection certification is current (performed annually by SRM)."},
+      {category: "Engineering Controls & Ventilation", categoryKey: "EngControls", key: "LEV_in_use", full: "Local exhaust ventilation (LEV) is in use and in good working order (i.e. snorkel, dust collector)."},
+      {category: "Engineering Controls & Ventilation", categoryKey: "EngControls", key: "BSC_certified", full: "Biological Safety Cabinet (BSC) is certified, cleaned/decontaminated, not used with volatile chemicals or open flame. Vacuum lines w/filters and disinfectant traps. HEPA filter replacement."},
+      {category: "Gas Cylinders", categoryKey: "GasCylinders", key: "Cylinders_secured", full: "Cylinders properly chained, secured, and clearly labeled with contents. Storage in dry, ventilated, fire-resistant location. Caution signs posted for gas type hazard (flammable, toxic, oxidizer, etc.)."},
+      {category: "Gas Cylinders", categoryKey: "GasCylinders", key: "Cylinder_caps", full: "Cylinder caps on reserve cylinders. Empty cylinders labeled and stored separately."},
+      {category: "Gas Cylinders", categoryKey: "GasCylinders", key: "Incompatible_stored", full: "Incompatible cylinders stored separately (oxygen/flammable 20' or 5' fire wall)."},
+      {category: "Gas Cylinders", categoryKey: "GasCylinders", key: "Cylinder_equipment", full: "Cylinder equipment (regulator, tubing, etc.) is compatible with gas and in proper working order."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "CHP_available", full: "Chemical Hygiene Plan (CHP) is available to personnel working with hazardous chemicals. Lab specific CHP is current and documented."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "SOP_documented", full: "Standard Operating Procedure (SOP) documented for particularly hazardous chemicals and/or high-risk procedures."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Chemical_inventory", full: "Chemical inventory is submitted annually."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "SDS_available", full: "Safety Data Sheets (SDS) are available in print or electronic format and personnel know how to access the SDS when needed."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Containers_labeled", full: "Chemical containers are labeled with contents, appropriate hazard warnings, and expiration dates."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Time_sensitive", full: "Time-sensitive chemicals (i.e. peroxide formers) are labeled with date opened and removed as hazard waste when expired."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Storage_organized", full: "Chemical storage is well organized and incompatible materials are segregated (oxidizers/flammables, acids/bases)."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Hazardous_stored", full: "Hazardous materials/liquids are stored below eye level (not on the floor) and are stored in secondary containers."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Chemicals_compatible", full: "Chemicals are stored in compatible containers and cabinets (acids in non-metal cabinets, flammables in approved cabinets, refrigeration)."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Containers_closed", full: "Chemical containers are kept closed."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Unnecessary_removed", full: "Unnecessary, unused, or outdated materials are removed for hazard waste disposal."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Flammable_cabinets", full: "Flammable liquid storage cabinets are properly labeled, kept closed, and have no materials stored on top of them."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Labels_clear", full: "All labels are clear and not faded."},
+      {category: "Chemical Management", categoryKey: "Chem", key: "Cabinets_fastened", full: "All cabinets over 3ft tall or located above the 3ft tall mark are fastened to the floor or wall."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Waste_labeled", full: "Hazardous waste containers are labeled with contents, accumulation start date, and generator."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Waste_closed", full: "Waste containers are kept closed to prevent off-gassing discharge."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Wastes_removed", full: "Hazardous wastes are removed for disposal before the 12-month accumulation limit."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Secondary_containers", full: "Secondary containers are used to store glass waste collection bottles to capture leaks/spills."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Sharps_disposed", full: "Syringes and other sharps waste are disposed of in approved sharps container. Labeled as \"biohazard\" or \"non-contaminated” sharps."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Needles_disposed", full: "Needles are not re-capped, bent, or broken and are disposed of immediately in appropriate container."},
+      {category: "Waste Management", categoryKey: "Waste", key: "Biological_waste", full: "Biological waste is collected in approved bag and disposed of in a timely manner."},
+      {category: "Equipment Safety", categoryKey: "Equip", key: "Machinery_safeguards", full: "Rotating machinery and high temperature devices have approved safeguards. Safety switches and emergency stops are working."},
+      {category: "Equipment Safety", categoryKey: "Equip", key: "Safety_training_equip", full: "Safety training for hazardous equipment is documented (SOP, training checklist, badge system)."},
+      {category: "Radiation Safety", categoryKey: "Rad", key: "Radiation_registered", full: "Radiation Producing Equipment is registered with SRM and NC Radiation Protection Section."},
+      {category: "Electrical Safety", categoryKey: "Elec", key: "No_frayed_wiring", full: "Equipment does not have frayed or damaged wiring."},
+      {category: "Electrical Safety", categoryKey: "Elec", key: "No_extension_permanent", full: "Extension cords are not being used as permanent wiring."},
+      {category: "Electrical Safety", categoryKey: "Elec", key: "Power_strips", full: "Power strips are suitable for the load involved and are plugged directly into the outlet (not \"daisy-chained\")."},
+      {category: "Biological Safety", categoryKey: "Bio", key: "Approval_documented", full: "Approval is documented for work requiring additional registration (Animal research with IACUC, rDNA with IBC)."},
+      {category: "Biological Safety", categoryKey: "Bio", key: "Inventory_biological", full: "Inventory of Biological Agents is submitted annually to SRM."},
+      {category: "Biological Safety", categoryKey: "Bio", key: "Disinfectant_in_use", full: "Approved disinfectant is in use and bleach solutions are freshly prepared (within 24 hours)."},
+      {category: "Cold Room Safety", categoryKey: "ColdRoom", key: "Emergency_release", full: "Cold room has an emergency release mechanism."},
+      {category: "Cold Room Safety", categoryKey: "ColdRoom", key: "No_cardboard", full: "Cardboard is not stored in the area."},
+      {category: "Cold Room Safety", categoryKey: "ColdRoom", key: "No_asphyxiates", full: "Asphyxiates and hazardous gases are not used in cold room, unless adequate ventilation is present."},
+      {category: "Cold Room Safety", categoryKey: "ColdRoom", key: "Housekeeping_observed", full: "General housekeeping is observed and the area is organized, uncluttered, and sanitary."},
+      {category: "Cold Room Safety", categoryKey: "ColdRoom", key: "No_expired_samples", full: "Expired/abandoned samples are not stored."},
+      {category: "Laser Safety", categoryKey: "Laser", key: "Laser_SOP", full: "Laser SOP available to authorized users and training documented."},
+      {category: "Laser Safety", categoryKey: "Laser", key: "Laser_registered", full: "Laser (Class 3b or 4) registered with SRM."},
+      {category: "Laser Safety", categoryKey: "Laser", key: "Access_restricted", full: "Access is restricted to prevent accidental exposure while the laser is operating. Protective housing is intact to prevent exposure."},
+      {category: "Laser Safety", categoryKey: "Laser", key: "Areas_posted", full: "Laser controlled areas are posted with appropriate caution signs."},
+      {category: "Laser Safety", categoryKey: "Laser", key: "Beam_stops", full: "Beam stops are present at the end of all beam paths and are non-combustible."},
+      {category: "Laser Safety", categoryKey: "Laser", key: "Safety_glasses", full: "Approved safety glasses are available."}
+    ];
+
+    // --- NEW: Client-side image resizing function ---
+    function processAndResizeImage(file, maxSizeKB) {
+        return new Promise((resolve, reject) => {
+            const maxSize = maxSizeKB * 1024;
+            // If it's not an image or is already small enough, return original
+            if (!file.type.startsWith('image/') || file.size <= maxSize) {
+                resolve(file);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Calculate new dimensions to maintain aspect ratio
+                    const ratio = Math.sqrt(maxSize / file.size);
+                    const newWidth = img.width * ratio;
+                    const newHeight = img.height * ratio;
+                    
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    
+                    // Draw resized image
+                    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                    
+                    // Export from canvas as a new File object
+                    canvas.toBlob((blob) => {
+                        const resizedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        console.log(`Resized ${file.name} from ${(file.size / 1024).toFixed(1)}KB to ${(resizedFile.size / 1024).toFixed(1)}KB`);
+                        resolve(resizedFile);
+                    }, 'image/jpeg', 0.8); // 0.8 is a quality setting
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+// Generate form and attach image processing listeners
+function generateFormFields() {
+    formContainer.innerHTML = '';
+    let currentCategory = "";
+    const ratingOptions = ["Acceptable", "Deficient", "Not Observed", "Not Applicable"];
+
+    entries.forEach(entry => {
+        if (entry.category !== currentCategory) {
+            currentCategory = entry.category;
+            const h4 = document.createElement('h4');
+            h4.textContent = currentCategory;
+            formContainer.appendChild(h4);
+        }
+        
+        const radioName = `rating_${entry.categoryKey}_${entry.key}`;
+        const div = document.createElement('div');
+        div.className = 'form-entry';
+        
+        // MODIFICATION: Added capture="environment" to the input element below
+        div.innerHTML = `
+          <label><strong>${entry.full}</strong></label><br>
+          <div class="radio-group">
+            ${ratingOptions.map(opt => {
+              const cleanOpt = opt.replace(/\s+/g, '');
+              const radioId = `${radioName}_${cleanOpt}`;
+              return `<input type="radio" id="${radioId}" name="${radioName}" value="${opt}"><label for="${radioId}">${opt}</label>`;
+            }).join('')}
+          </div>
+          <div class="previous-comments-display" id="previous_comments_${entry.categoryKey}_${entry.key}" style="display: none;"></div>
+          <textarea id="comments_${entry.categoryKey}_${entry.key}" placeholder="Add new comments here..."></textarea>
+          <div class="image-previews" id="previews_${entry.categoryKey}_${entry.key}">
+            <div class="existing-images-container"></div>
+            <div class="new-images-container"></div>
+          </div>
+          <input type="file" id="pictures_${entry.categoryKey}_${entry.key}" multiple accept="image/*" capture="environment" />
+        `;
+        formContainer.appendChild(div);
+    });
+    
+    document.querySelectorAll('input[type="file"]').forEach(input => {
+        input.addEventListener('change', async (event) => {
+            const files = event.target.files;
+            const inputId = event.target.id;
+            
+            const mainPreviewContainerId = inputId.replace('pictures_', 'previews_');
+            const mainPreviewContainer = document.getElementById(mainPreviewContainerId);
+            const newImagesContainer = mainPreviewContainer.querySelector('.new-images-container');
+
+            if (!files.length) {
+                if (newImagesContainer) newImagesContainer.innerHTML = '';
+                processedFiles[inputId] = [];
+                return;
+            }
+            
+            output.textContent = `Processing ${files.length} image(s)...`;
+            processedFiles[inputId] = [];
+            
+            const processingPromises = Array.from(files).map(file => processAndResizeImage(file, MAX_IMAGE_SIZE_KB));
+            const results = await Promise.all(processingPromises);
+            
+            processedFiles[inputId] = results;
+            
+            newImagesContainer.innerHTML = '<strong>Newly Selected:</strong><br>';
+            results.forEach(file => {
+                const previewUrl = URL.createObjectURL(file);
+                const img = document.createElement('img');
+                img.src = previewUrl;
+                img.className = 'preview-thumbnail';
+                img.onclick = () => showImageModal(previewUrl);
+                img.onload = () => URL.revokeObjectURL(img.src);
+                newImagesContainer.appendChild(img);
+            });
+
+            const resizedCount = results.filter(f => f.originalSize && f.size < f.originalSize).length;
+            output.textContent = `Processed ${results.length} image(s). ${resizedCount > 0 ? `${resizedCount} were resized.` : ''} Ready to save.`;
+        });
+    });
+}
+
+    generateFormFields();
+    
+function applyFormFilter() {
+    // 1. Get all checked filter values
+    const checkboxes = document.querySelectorAll('.filter-cb');
+    const activeFilters = Array.from(checkboxes)
+                            .filter(cb => cb.checked)
+                            .map(cb => cb.value);
+
+    const formEntries = formContainer.querySelectorAll('.form-entry');
+    const categoryHeadings = formContainer.querySelectorAll('h4');
+
+    // 2. If nothing is checked, SHOW ALL (Default state)
+    if (activeFilters.length === 0) {
+        formEntries.forEach(entry => entry.style.display = 'block');
+        categoryHeadings.forEach(h => h.style.display = 'block');
+        return;
+    }
+
+    // 3. Filter Logic
+    formEntries.forEach(entry => {
+        let shouldShow = false;
+
+        // Check Status (Radio Buttons)
+        // We look for the checked radio button within this entry
+        const selectedRadio = entry.querySelector('input[type="radio"]:checked');
+        if (selectedRadio) {
+            // Remove spaces from value to match filter values (e.g., "Not Applicable" -> "NotApplicable")
+            const status = selectedRadio.value.replace(/\s+/g, '');
+            if (activeFilters.includes(status)) {
+                shouldShow = true;
+            }
+        }
+
+        // Check Comments (Textarea OR Previous Comments div)
+        if (activeFilters.includes('HasComments')) {
+            const newComment = entry.querySelector('textarea').value.trim();
+            // Get text from the previous comments div, if it's visible
+            const prevCommentDiv = entry.querySelector('.previous-comments-display');
+            const prevComment = (prevCommentDiv && prevCommentDiv.style.display !== 'none') 
+                                ? prevCommentDiv.innerText 
+                                : '';
+            
+            if (newComment.length > 0 || prevComment.length > 0) {
+                shouldShow = true;
+            }
+        }
+
+        // Check Images
+        if (activeFilters.includes('HasImages')) {
+            // We check for any img tags in the preview containers
+            const thumbnails = entry.querySelectorAll('.preview-thumbnail');
+            if (thumbnails.length > 0) {
+                shouldShow = true;
+            }
+        }
+
+        entry.style.display = shouldShow ? 'block' : 'none';
+    });
+
+    // 4. Cleanup Headings (Hide headings with no visible children)
+    categoryHeadings.forEach(h => {
+        let nextElement = h.nextElementSibling;
+        let hasVisibleItems = false;
+        while (nextElement && nextElement.tagName !== 'H4') {
+            if (nextElement.classList.contains('form-entry') && nextElement.style.display !== 'block') {
+                // it's hidden
+            } else if (nextElement.classList.contains('form-entry')) {
+                hasVisibleItems = true;
+                break;
+            }
+            nextElement = nextElement.nextElementSibling;
+        }
+        h.style.display = hasVisibleItems ? 'block' : 'none';
+    });
+}
+
+// NEW: Function to load drafts for the current user
+async function loadUserDrafts(userId) {
+    const { data: drafts, error } = await supabase
+        .from('reports')
+        .select('id, title, created_at')
+        .eq('user_id', userId)
+        .eq('status', 'draft')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        output.textContent = "Could not load drafts: " + error.message;
+        return;
+    }
+
+    if (drafts.length > 0) {
+        userDraftsSection.style.display = 'block';
+        let html = '<h4>Your Draft Reports</h4><ul>';
+        drafts.forEach(draft => {
+            html += `<li>${draft.title} - <button class="link-button" onclick="editReport('${draft.id}')">Continue Editing</button></li>`;
+        });
+        html += '</ul>';
+        userDraftsSection.innerHTML = html;
+    } else {
+        userDraftsSection.style.display = 'none';
+    }
+}
+
+async function handleUserSession(userId) {
+    authSection.style.display = "none";
+    signOutBtn.style.display = "inline";
+    // For Admins, we hide the filter initially until they load the dashboard
+    // For Users, we show it immediately
+    
+    const { data: profile, error: profileError } = await supabase.from("profiles").select("is_admin, email").eq("id", userId).single();
+
+    if (profileError || !profile) {
+        output.textContent = "Error fetching profile: " + (profileError?.message || "Profile not found.");
+        authSection.style.display = "block";
+        signOutBtn.style.display = "none";
+        return;
+    }
+
+    isCurrentUserAdmin = profile.is_admin; // <--- SET THE GLOBAL VARIABLE
+    
+    if (isCurrentUserAdmin) {
+        adminSection.style.display = "block";
+        reportSection.style.display = "none";
+        filterContainer.style.display = 'block'; // Admin needs filter for the list
+        await loadAllReports(userId, profile.email);
+    } else {
+        reportSection.style.display = "block";
+        adminSection.style.display = "none";
+        filterContainer.style.display = 'block'; // User needs filter for the form
+        
+        // Default User View: Show Start Button, Hide Form
+        activeFormContainer.style.display = 'none';
+        startReportControls.style.display = 'block';
+        
+        await loadUserDrafts(userId);
+        await loadUserCorrectiveActions(userId);
+        await loadUserSubmittedReports(userId);
+    }
+    setupReportButtons(userId, isCurrentUserAdmin);
+};
+
+function setupReportButtons(userId, isAdmin) {
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    const submitReportBtn = document.getElementById('submitReportBtn');
+    const saveReviewBtn = document.getElementById('saveReviewBtn');
+
+    // Button Visibility Logic
+    if (isAdmin) {
+        saveDraftBtn.style.display = 'none';
+        submitReportBtn.style.display = 'none';
+        saveReviewBtn.style.display = 'inline-block';
+    } else {
+        saveDraftBtn.style.display = 'inline-block';
+        submitReportBtn.style.display = 'inline-block';
+        saveReviewBtn.style.display = 'none';
+    }
+
+    const saveReport = async (status) => {
+        const title = titleInput.value;
+        if (!title) { output.textContent = "Please fill in the report title."; return; }
+        
+        // Validation for non-admins submitting
+        if (status === 'submitted' && !isAdmin) {
+            const incompleteEntries = [];
+            for (const entry of entries) {
+                const isChecked = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"]:checked`);
+                if (!isChecked) {
+                    incompleteEntries.push(entry);
+                }
+            }
+            if (incompleteEntries.length > 0) {
+                const userConfirmed = window.confirm(
+                    `There are ${incompleteEntries.length} incomplete items. Would you like to mark them all as "Acceptable" and submit?`
+                );
+                if (userConfirmed) {
+                    incompleteEntries.forEach(entry => {
+                        const acceptableRadio = document.getElementById(`rating_${entry.categoryKey}_${entry.key}_Acceptable`);
+                        if (acceptableRadio) acceptableRadio.checked = true;
+                    });
+                } else {
+                    output.textContent = "Submission cancelled. Please complete all items.";
+                    return;
+                }
+            }
+        }
+
+        output.textContent = "Saving report, please wait...";
+        saveDraftBtn.disabled = true;
+        submitReportBtn.disabled = true;
+        saveReviewBtn.disabled = true;
+
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+            output.textContent = "Could not get user session. Please sign in again.";
+            saveDraftBtn.disabled = false; submitReportBtn.disabled = false; saveReviewBtn.disabled = false;
+            return;
+        }
+        
+        // Get username for comment attribution
+        const username = session.user.email.split('@')[0];
+
+        // Prepare Data Object
+        // We clone currentEditingData so we don't lose structure, or start fresh if null
+        const inspectionData = currentEditingData ? JSON.parse(JSON.stringify(currentEditingData)) : {};
+        const filesToUpload = [];
+
+        for (const entry of entries) {
+            // Ensure structure exists
+            if (!inspectionData[entry.category]) inspectionData[entry.category] = {};
+            if (!inspectionData[entry.category][entry.full]) {
+                inspectionData[entry.category][entry.full] = { rating: '', comments: '', images: [] };
+            }
+
+            // 1. Save Rating
+            const checkedRadio = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"]:checked`);
+            inspectionData[entry.category][entry.full].rating = checkedRadio ? checkedRadio.value : "";
+            
+            // 2. Save Comments (FIXED LOGIC)
+            const newCommentInput = document.getElementById(`comments_${entry.categoryKey}_${entry.key}`);
+            const newCommentText = newCommentInput.value.trim();
+            
+            // Get the *original* comment from the source data (before this edit session)
+            // We look at 'currentEditingData' because 'inspectionData' is being modified right now
+            let originalComment = "";
+            if (currentEditingData && currentEditingData[entry.category] && currentEditingData[entry.category][entry.full]) {
+                originalComment = currentEditingData[entry.category][entry.full].comments || "";
+            }
+
+            if (newCommentText) {
+                const timestamp = new Date().toLocaleString();
+                const attribution = `[Added by ${username} on ${timestamp}]:`;
+                
+                if (originalComment) {
+                    // Append new comment to old comment with 2 newlines
+                    inspectionData[entry.category][entry.full].comments = originalComment + "\n\n" + attribution + "\n" + newCommentText;
+                } else {
+                    // Just the new comment
+                    inspectionData[entry.category][entry.full].comments = attribution + "\n" + newCommentText;
+                }
+            } else {
+                // If no new text was typed, KEEP the original comment exactly as it was
+                inspectionData[entry.category][entry.full].comments = originalComment;
+            }
+
+            // 3. Queue New Images
+            const inputId = `pictures_${entry.categoryKey}_${entry.key}`;
+            const newFiles = processedFiles[inputId] || [];
+            for (const file of newFiles) {
+                filesToUpload.push({ file, category: entry.category, full: entry.full });
+            }
+        }
+
+        const reportPayload = {
+            user_id: userId,
+            title,
+            description: descriptionInput.value,
+            status,
+            inspection_data: inspectionData
+        };
+
+        // --- NEW: If Admin is saving, add a verification record ---
+        if (isAdmin && status !== 'draft') {
+            // Fetch existing verification data if needed, or append to it
+            // For now, we update the main payload. 
+            // Note: If you have a specific column for 'verified_data', you should append to it here.
+            // This assumes your table has a 'verified_data' JSONB column.
+            const { data: currentReport } = await supabase.from('reports').select('verified_data').eq('id', editReportId.value).single();
+            let verifications = currentReport?.verified_data || [];
+            
+            // Add this verification event
+            verifications.push({
+                user_id: userId,
+                verified_at: new Date().toISOString()
+            });
+            
+            reportPayload.verified_data = verifications;
+        }
+
+        let reportId = editReportId.value;
+        
+        // DB Operations
+        if (!reportId) {
+            const { data: newReport, error } = await supabase.from("reports").insert(reportPayload).select().single();
+            if (error) { output.textContent = `Error creating report: ${error.message}`; saveDraftBtn.disabled = false; submitReportBtn.disabled = false; saveReviewBtn.disabled = false; return; }
+            reportId = newReport.id;
+        } else {
+            const { error } = await supabase.from("reports").update(reportPayload).eq("id", reportId);
+            if (error) { output.textContent = `Error updating report: ${error.message}`; saveDraftBtn.disabled = false; submitReportBtn.disabled = false; saveReviewBtn.disabled = false; return; }
+        }
+
+        // Image Uploads
+        if (filesToUpload.length > 0) {
+            output.textContent = `Report saved. Now uploading ${filesToUpload.length} new image(s)...`;
+            for (const item of filesToUpload) {
+                const filePath = `user/${userId}/${reportId}/${Date.now()}-${item.file.name}`;
+                const { error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(filePath, item.file);
+                if (!uploadError) {
+                    inspectionData[item.category][item.full].images.push(filePath);
+                }
+            }
+            await supabase.from("reports").update({ inspection_data: inspectionData }).eq("id", reportId);
+        }
+        
+        output.textContent = `Report '${title}' saved successfully!`;
+        saveDraftBtn.disabled = false;
+        submitReportBtn.disabled = false;
+        saveReviewBtn.disabled = false;
+        
+        clearForm();
+        
+        // Reset View State
+        if (isAdmin) {
+            await loadAllReports();
+            reportSection.style.display = 'none';
+            adminSection.style.display = 'block';
+        } else {
+            await loadUserDrafts(userId);
+            await loadUserSubmittedReports(userId);
+            
+            activeFormContainer.style.display = 'none';
+            startReportControls.style.display = 'block';
+
+            saveDraftBtn.style.display = 'inline-block';
+            submitReportBtn.style.display = 'inline-block';
+            saveReviewBtn.style.display = 'none';
+            window.scrollTo(0,0);
+        }
+    };
+
+    saveDraftBtn.onclick = () => saveReport('draft');
+    submitReportBtn.onclick = () => saveReport('submitted');
+    saveReviewBtn.onclick = () => {
+        const currentReportId = editReportId.value;
+        const currentStatus = allReportsData[currentReportId]?.status || 'submitted';
+        saveReport(currentStatus);
+    };
+}
+
+function clearForm() {
+    titleInput.value = '';
+    descriptionInput.value = '';
+    editReportId.value = '';
+    
+    document.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+    document.querySelectorAll('#reportSection textarea, #reportSection input[type="file"]').forEach(el => el.value = '');
+    
+    document.querySelectorAll('.previous-comments-display').forEach(div => {
+        div.innerHTML = '';
+        div.style.display = 'none';
+    });
+
+    document.querySelectorAll('.image-previews').forEach(div => div.innerHTML = '');
+    
+    // Reset button visibility to the default for non-admins
+    document.getElementById('saveDraftBtn').style.display = 'inline-block';
+    document.getElementById('submitReportBtn').style.display = 'inline-block';
+    document.getElementById('saveReviewBtn').style.display = 'none';
+
+    processedFiles = {}; 
+    currentEditingData = null;
+    userDraftsSection.style.display = 'none';
+    userDraftsSection.innerHTML = '';
+    output.textContent = 'Form cleared. Ready for new report.';
+}
+
+    signUpBtn.onclick = async () => {
+      const { data, error } = await supabase.auth.signUp({
+        email: emailInput.value, password: passwordInput.value,
+      });
+      if (error) output.textContent = "Sign-up failed:\n" + JSON.stringify(error, null, 2);
+      else {
+        window.alert("User account created! Check your email for confirmation before signing in.");
+        output.textContent = "Sign-up success! Check email for confirmation.";
+      }
+    };
+
+    // Sign In
+    signInBtn.onclick = async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value, password: passwordInput.value,
+      });
+      if (error) output.textContent = "Sign-in failed:\n" + JSON.stringify(error, null, 2);
+      else await handleUserSession(data.user.id);
+    };
+
+signOutBtn.onclick = async () => { 
+        await supabase.auth.signOut();
+        authSection.style.display = "block";
+        reportSection.style.display = "none";
+        adminSection.style.display = "none";
+        signOutBtn.style.display = "none";
+        filterContainer.style.display = "none"; // <-- Add this line
+        reportsList.innerHTML = "";
+        allReportsData = {}; // Clear stored data on sign out
+        output.textContent = "Signed out.";
+     };
+
+    // Button for admins to show the create form
+showCreateFormBtn.addEventListener('click', () => {
+    clearForm();
+    
+    // Hide Admin Dashboard
+    adminSection.style.display = 'none';
+    
+    // Show Report Section and Form Container directly
+    reportSection.style.display = 'block';
+    activeFormContainer.style.display = 'block';
+    
+    // Hide the User's "Start New" button (Fixes redundancy)
+    startReportControls.style.display = 'none';
+    
+    filterContainer.style.display = 'block';
+    window.scrollTo(0, 0);
+});
+
+
+
+window.editReport = async (id) => {
+    output.textContent = `Loading report ${id}...`;
+    clearForm();
+    const { data: report, error } = await supabase.from("reports").select("*").eq("id", id).single();
+    if (error || !report) { output.textContent = `Error loading report: ${error?.message}`; return; }
+
+    filterContainer.style.display = 'block';
+    
+    // --- VISIBILITY MANAGEMENT ---
+    // 1. Always show the report section and the active form
+    reportSection.style.display = 'block';
+    activeFormContainer.style.display = 'block';
+    
+    // 2. Hide the redundant "Start New" button
+    startReportControls.style.display = 'none';
+
+    // 3. IMPORTANT: If Admin, HIDE the admin dashboard so the filter works on the form
+    if (isCurrentUserAdmin) {
+        adminSection.style.display = 'none';
+    }
+    // -----------------------------
+
+    editReportId.value = report.id;
+    titleInput.value = report.title;
+    descriptionInput.value = report.description;
+    currentEditingData = report.inspection_data;
+
+    // ... (Keep the rest of the function exactly the same: populating radio buttons, comments, images) ...
+    if (currentEditingData) {
+        for (const entry of entries) {
+            const data = currentEditingData[entry.category]?.[entry.full];
+            if (data) {
+                const radioToSelect = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"][value="${data.rating}"]`);
+                if (radioToSelect) radioToSelect.checked = true;
+                
+                const commentsEl = document.getElementById(`comments_${entry.categoryKey}_${entry.key}`);
+                const prevCommentsDisplay = document.getElementById(`previous_comments_${entry.categoryKey}_${entry.key}`);
+                const originalComment = data.comments || '';
+
+                if (prevCommentsDisplay && commentsEl) {
+                    if (originalComment) {
+                        prevCommentsDisplay.innerHTML = `<strong>Previous Comments:</strong><br>${originalComment}`;
+                        prevCommentsDisplay.style.display = 'block';
+                    } else {
+                        prevCommentsDisplay.style.display = 'none';
+                    }
+                    commentsEl.value = '';
+                }
+
+                if (data.images && data.images.length > 0) {
+                    const mainPreviewContainer = document.getElementById(`previews_${entry.categoryKey}_${entry.key}`);
+                    if (mainPreviewContainer) {
+                        mainPreviewContainer.innerHTML = `<div class="existing-images-container"></div><div class="new-images-container"></div>`;
+                        const previewContainer = mainPreviewContainer.querySelector('.existing-images-container');
+                        previewContainer.innerHTML = '<strong>Existing Images:</strong><br>';
+                        
+                        const urlPromises = data.images.map(path => supabase.storage.from(BUCKET_NAME).createSignedUrl(path, 60));
+                        const urlResults = await Promise.all(urlPromises);
+                        urlResults.forEach(result => {
+                            if (result.data?.signedUrl) {
+                                const img = document.createElement('img');
+                                img.src = result.data.signedUrl;
+                                img.className = 'preview-thumbnail';
+                                img.onclick = () => showImageModal(result.data.signedUrl);
+                                previewContainer.appendChild(img);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+    output.textContent = `Editing report: ${report.title}`;
+    
+    // Apply filter immediately in case the box was already checked
+    applyFormFilter();
+    
+    activeFormContainer.scrollIntoView({ behavior: 'smooth' });
+};
+	
+// REWRITTEN: deleteReport now correctly removes associated images from Storage
+window.deleteReport = async (id) => {
+    if (!confirm("Are you sure you want to delete this report and all its images? This cannot be undone.")) return;
+
+    try {
+        output.textContent = "Deleting report, please wait...";
+
+        // Step 1: Fetch the report to get the list of image paths
+        const { data: report, error: fetchError } = await supabase
+            .from("reports")
+            .select("inspection_data")
+            .eq("id", id)
+            .single();
+
+        if (fetchError) {
+            throw new Error(`Could not fetch report to get image paths: ${fetchError.message}`);
+        }
+
+        // Collect all file paths from the nested JSON structure
+        const pathsToDelete = [];
+        if (report && report.inspection_data) {
+            for (const category in report.inspection_data) {
+                for (const entry in report.inspection_data[category]) {
+                    const images = report.inspection_data[category][entry].images;
+                    if (images && images.length > 0) {
+                        pathsToDelete.push(...images); // Add all images from the entry
+                    }
+                }
+            }
+        }
+
+        // Step 2: Delete the files from storage, if there are any
+        if (pathsToDelete.length > 0) {
+            const { data: deleteData, error: storageError } = await supabase
+                .storage
+                .from(BUCKET_NAME)
+                .remove(pathsToDelete);
+
+            if (storageError) {
+                // The report will still be deleted, but we warn the user about the cleanup failure.
+                throw new Error(`Failed to clean up ${pathsToDelete.length} images from storage. Please notify an admin. Error: ${storageError.message}`);
+            }
+            console.log('Successfully deleted images from storage:', deleteData);
+        }
+
+        // Step 3: Delete the database row
+        const { error: deleteError } = await supabase
+            .from("reports")
+            .delete()
+            .eq("id", id);
+
+        if (deleteError) {
+            throw new Error(`Failed to delete report from database: ${deleteError.message}`);
+        }
+
+        output.textContent = `Report and its ${pathsToDelete.length} associated images deleted successfully.`;
+        await loadAllReports();
+
+    } catch (error) {
+        // A catch-all for any of the steps failing.
+        output.textContent = `An error occurred during deletion: ${error.message}`;
+        console.error(error);
+        // It's a good idea to still try and reload the list even if parts failed
+        await loadAllReports();
+    }
+};
+
+async function generateDetailsHtml(report) {
+    const inspectionData = report.inspection_data;
+    let html = '';
+
+    // Verifier Info
+    if (report.verified_data && report.verified_data.length > 0) {
+        html += '<div class="verifier-info"><strong>Verified By:</strong><ul>';
+        report.verified_data.forEach(verification => {
+            const email = userEmailMap[verification.user_id] || 'Unknown User';
+            const date = new Date(verification.verified_at).toLocaleString();
+            html += `<li>${email} on ${date}</li>`;
+        });
+        html += '</ul></div>';
+    }
+
+    if (!inspectionData) {
+        html += "<p>No inspection data found.</p>";
+        return html;
+    }
+    
+    // --- NEW FILTER LOGIC FOR DETAILS ---
+    const checkboxes = document.querySelectorAll('.filter-cb');
+    const activeFilters = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    const isFilterActive = activeFilters.length > 0;
+
+    let itemsRendered = 0;
+    
+    for (const category in inspectionData) {
+        let categoryHtml = `<h5>${category}</h5>`;
+        let categoryItemsRendered = 0;
+        
+        for (const fullText in inspectionData[category]) {
+            const entryData = inspectionData[category][fullText];
+            
+            // Determine if we should show this entry
+            let shouldShow = false;
+            
+            if (!isFilterActive) {
+                shouldShow = true; // Show all if no filter
+            } else {
+                // Check Status
+                const ratingClean = entryData.rating ? entryData.rating.replace(/\s+/g, '') : '';
+                if (activeFilters.includes(ratingClean)) shouldShow = true;
+                
+                // Check Comments
+                const hasComments = entryData.comments && entryData.comments.trim() !== "";
+                if (activeFilters.includes('HasComments') && hasComments) shouldShow = true;
+                
+                // Check Images
+                const hasImages = entryData.images && entryData.images.length > 0;
+                if (activeFilters.includes('HasImages') && hasImages) shouldShow = true;
+            }
+
+            if (shouldShow) {
+                categoryItemsRendered++;
+                const ratingClass = entryData.rating ? `rating-${entryData.rating.replace(/\s+/g, '')}` : '';
+                
+                categoryHtml += `<div class="detail-entry">
+                    <p><strong>${fullText}</strong></p>
+                    <p><strong>Status:</strong> <span class="detail-rating ${ratingClass}">${entryData.rating || 'Not Rated'}</span></p>`;
+                
+                if (entryData.comments && entryData.comments.trim() !== "") {
+                    categoryHtml += `<div class="detail-comments"><strong>Comments:</strong><br>${entryData.comments}</div>`;
+                }
+                
+                if (entryData.images && entryData.images.length > 0) {
+                    // Note: We use the existing logic for signed URLs
+                    const imagePromises = entryData.images.map(filePath => supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, 60 * 15));
+                    const signedUrlResults = await Promise.all(imagePromises);
+                    categoryHtml += '<div class="detail-images">';
+                    signedUrlResults.forEach(result => {
+                        if (result.data && result.data.signedUrl) {
+                            categoryHtml += `<a href="${result.data.signedUrl}" target="_blank" rel="noopener noreferrer"><img src="${result.data.signedUrl}" alt="Report image"></a>`;
+                        }
+                    });
+                    categoryHtml += '</div>';
+                }
+                categoryHtml += `</div>`;
+            }
+        }
+        if (categoryItemsRendered > 0) { html += categoryHtml; itemsRendered += categoryItemsRendered; }
+    }
+    
+    if (itemsRendered === 0 && isFilterActive) {
+        html += `<p>No items match the current filter criteria.</p>`;
+    }
+    
+    return html;
+}
+
+    window.toggleReportDetails = async function(reportId) {
+        const detailsDiv = document.getElementById(`details-${reportId}`);
+        const reportData = allReportsData[reportId];
+        if (!detailsDiv || !reportData) return;
+
+        // If it's already open, just close it.
+        if (detailsDiv.style.display === 'block') {
+            detailsDiv.style.display = 'none';
+        } else {
+            // If it's closed, regenerate the content based on the current filter and then show it.
+            detailsDiv.innerHTML = '<p>Loading details...</p>'; // Show loading state
+            detailsDiv.innerHTML = await generateDetailsHtml(reportData); // Regenerate content
+            detailsDiv.style.display = 'block';
+        }
+    }
+    
+    const filterCheckboxes = document.querySelectorAll('.filter-cb');
+    filterCheckboxes.forEach(cb => {
+        cb.addEventListener('change', async () => {
+            // 1. If Admin Dashboard is visible
+            if (adminSection.style.display === 'block') {
+                const openDetailDivs = document.querySelectorAll('.report-details[style*="display: block"]');
+                for (const div of openDetailDivs) {
+                    const reportId = div.id.replace('details-', '');
+                    if (allReportsData[reportId]) {
+                        // Refresh the details HTML with new filter
+                        div.innerHTML = await generateDetailsHtml(allReportsData[reportId]);
+                    }
+                }
+            } 
+            // 2. If Form is visible
+            else if (activeFormContainer.style.display === 'block') {
+                applyFormFilter();
+            }
+        });
+    });
+
+async function loadAllReports(currentAdminId, currentAdminEmail) {
+    const { data: reports, error } = await supabase.from("reports").select(`*`).order("created_at", { ascending: false });
+    if (error) { output.textContent = `Failed to load reports: ${error.message}`; return; }
+    
+    const verifierIds = new Set();
+    reports.forEach(report => {
+        if (report.verified_data) {
+            report.verified_data.forEach(v => verifierIds.add(v.user_id));
+        }
+    });
+    if (currentAdminId && currentAdminEmail) {
+        userEmailMap[currentAdminId] = currentAdminEmail;
+    }
+
+    if (verifierIds.size > 0) {
+        const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .in('id', Array.from(verifierIds));
+        if (profileError) console.error("Could not fetch verifier emails:", profileError);
+        else profiles.forEach(p => userEmailMap[p.id] = p.email);
+    }
+
+    const activeReportsList = document.getElementById("reportsList");
+    const historyReportsList = document.getElementById("historyReportsList");
+    let activeHtml = '';
+    let historyHtml = '';
+
+    // --- REVISED ACTION BUTTON LOGIC ---
+    const getActionButtons = (report) => {
+        let buttons = '';
+        if (report.status !== 'archived') {
+            // Actions for ACTIVE reports
+            buttons += `<button onclick="event.stopPropagation(); openAssignModal('${report.id}')">Assign Corrective Action</button>`;
+            buttons += `<button onclick="event.stopPropagation(); archiveReport('${report.id}')">Archive</button>`;
+            buttons += `<button onclick="event.stopPropagation(); editReport('${report.id}')">Review</button>`;
+        } else {
+            // Actions for ARCHIVED reports
+            buttons += `<button onclick="event.stopPropagation(); restoreReport('${report.id}')">Restore</button>`;
+        }
+        // Delete is available for all reports, active or archived
+        buttons += `<button onclick="event.stopPropagation(); deleteReport('${report.id}')">Delete</button>`;
+        return buttons;
+    }
+
+    reports.forEach(report => {
+        allReportsData[report.id] = report;
+        const deficientCount = countDeficient(report.inspection_data);
+        const reportHtml = `
+          <div class="report-summary-item">
+            <div class="report-header" onclick="toggleReportDetails('${report.id}')">
+              <div>
+                <strong>Title:</strong> ${report.title}<br>
+                <small>Status: ${report.status} | Deficient Items: ${deficientCount}</small>
+              </div>
+              <div class="report-actions">
+                ${getActionButtons(report)}
+              </div>
+            </div>
+            <div class="report-details" id="details-${report.id}"></div>
+          </div>`;
+
+        if (report.status === 'archived') {
+            historyHtml += reportHtml;
+        } else {
+            activeHtml += reportHtml;
+        }
+    });
+
+    activeReportsList.innerHTML = activeHtml || "<p>No active reports found.</p>";
+    historyReportsList.innerHTML = historyHtml || "<p>No archived reports found.</p>";
+}
+
+    function countDeficient(data) {
+        let count = 0;
+        if (!data) return 0;
+        Object.values(data).forEach(categoryData => {
+            Object.values(categoryData).forEach(entryData => {
+                if (entryData.rating === "Deficient") count++;
+            });
+        });
+        return count;
+    }
+
+
+
+window.archiveReport = async (reportId) => {
+    try {
+        const { error } = await supabase
+            .from('reports')
+            .update({ status: 'archived' })
+            .eq('id', reportId);
+
+        if (error) throw error;
+        
+        output.textContent = "Report successfully archived and moved to history.";
+        const { data: { session } } = await supabase.auth.getSession();
+        await loadAllReports(session.user.id, session.user.email);
+    } catch (error) {
+        output.textContent = `Error archiving report: ${error.message}`;
+        console.error(error);
+    }
+};
+
+// NEW: Function to load corrective actions for the current user
+async function loadUserCorrectiveActions(userId) {
+    const userCorrectiveActionsSection = document.getElementById('userCorrectiveActionsSection');
+    const { data: reports, error } = await supabase
+        .from('reports')
+        .select('id, title, created_at')
+        .eq('user_id', userId)
+        .eq('status', 'corrective_action')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        output.textContent = "Could not load corrective actions: " + error.message;
+        return;
+    }
+
+    if (reports.length > 0) {
+        userCorrectiveActionsSection.style.display = 'block';
+        let html = '<h4>Corrective Actions Assigned to You</h4><ul>';
+        reports.forEach(report => {
+            html += `<li>${report.title} - <button class="link-button" onclick="editReport('${report.id}')">Start Editing</button></li>`;
+        });
+        html += '</ul>';
+        userCorrectiveActionsSection.innerHTML = html;
+    } else {
+        userCorrectiveActionsSection.style.display = 'none';
+    }
+}
+
+// NEW: Functions to control the assignment modal
+const assignModal = document.getElementById('assignModal');
+const userSelect = document.getElementById('userSelect');
+const reportToAssignIdInput = document.getElementById('reportToAssignId');
+
+window.openAssignModal = async (reportId) => {
+    reportToAssignIdInput.value = reportId;
+    
+    // Fetch all non-admin users to populate the dropdown
+    const { data: users, error } = await supabase
+        .from('profiles')
+        .select('id, email');
+        //.eq('is_admin', false);
+
+    if (error) {
+        alert('Could not fetch users: ' + error.message);
+        return;
+    }
+
+    userSelect.innerHTML = users.map(user => `<option value="${user.id}">${user.email}</option>`).join('');
+    assignModal.style.display = 'block';
+};
+
+window.closeAssignModal = () => {
+    assignModal.style.display = 'none';
+};
+
+// Handle clicks outside the modal content
+window.onclick = (event) => {
+    if (event.target == assignModal) {
+        closeAssignModal();
+    }
+};
+
+// Connect the new function to the confirm button
+document.getElementById('confirmAssignBtn').onclick = assignCorrectiveAction;
+
+// REWRITTEN: `assignCorrectiveAction` now securely calls the Edge Function
+async function assignCorrectiveAction() {
+    const originalReportId = document.getElementById('reportToAssignId').value;
+    const assignedUserId = document.getElementById('userSelect').value;
+
+    if (!originalReportId || !assignedUserId) {
+        alert('Missing report ID or user ID.');
+        return;
+    }
+
+    output.textContent = "Assigning report, this may take a moment...";
+    try {
+        const { data, error } = await supabase.functions.invoke('assign-corrective-action', {
+            body: { originalReportId, assignedUserId },
+        });
+
+        if (error) {
+            throw new Error(error.message);
+        }
+
+        output.textContent = data.message || "Report successfully assigned for corrective action.";
+
+    } catch (error) {
+        output.textContent = `Error during assignment: ${error.message}`;
+        console.error(error);
+    } finally {
+        closeAssignModal();
+        const { data: { session } } = await supabase.auth.getSession();
+        await loadAllReports(session.user.id, session.user.email);
+    }
+}
+
+const imageModal = document.getElementById('imageModal');
+const modalImage = document.getElementById('modalImage');
+
+window.showImageModal = (src) => {
+    modalImage.src = src;
+    imageModal.style.display = 'block';
+};
+window.closeImageModal = () => {
+    imageModal.style.display = 'none';
+};
+
+// NEW function to restore an archived report
+window.restoreReport = async (reportId) => {
+    try {
+        const { error } = await supabase
+            .from('reports')
+            .update({ status: 'submitted' }) // Restore to a default active status
+            .eq('id', reportId);
+
+        if (error) throw error;
+        
+        output.textContent = "Report successfully restored to active list.";
+        const { data: { session } } = await supabase.auth.getSession();
+        await loadAllReports(session.user.id, session.user.email);
+    } catch (error) {
+        output.textContent = `Error restoring report: ${error.message}`;
+        console.error(error);
+    }
+};
+
+async function loadUserSubmittedReports(userId) {
+    const userSubmittedSection = document.getElementById('userSubmittedSection');
+    
+    // Fetch reports where user is author and status is submitted or archived
+    const { data: reports, error } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('user_id', userId)
+        .in('status', ['submitted', 'archived']) 
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        output.textContent = "Could not load submitted reports: " + error.message;
+        return;
+    }
+
+    if (reports.length > 0) {
+        userSubmittedSection.style.display = 'block';
+        let html = '<h4>My Submitted Reports</h4>';
+        
+        // We reuse the allReportsData object so toggleReportDetails works
+        reports.forEach(report => {
+            allReportsData[report.id] = report;
+            const date = new Date(report.created_at).toLocaleDateString();
+            
+            html += `
+              <div class="report-summary-item" style="border-left: 4px solid #007bff;">
+                <div class="report-header" style="cursor: default;">
+                  <div>
+                    <strong>${report.title}</strong> <span style="color:#777; font-size:0.9em;">(${date})</span><br>
+                    <small>Status: ${report.status}</small>
+                  </div>
+                  <div class="report-actions">
+                    <!-- View Button toggles details -->
+                    <button onclick="toggleReportDetails('${report.id}')">View</button>
+                    <!-- Copy Button creates a new draft from this data -->
+                    <button onclick="copyAndReopenReport('${report.id}')">Copy & Reopen</button>
+                  </div>
+                </div>
+                <!-- Container for details (hidden by default) -->
+                <div class="report-details" id="details-${report.id}"></div>
+              </div>`;
+        });
+        
+        userSubmittedSection.innerHTML = html;
+    } else {
+        userSubmittedSection.style.display = 'none';
+    }
+}
+
+window.copyAndReopenReport = async (id) => {
+    output.textContent = `Copying data from report...`;
+    
+    const report = allReportsData[id];
+    if (!report) { output.textContent = "Error: Report data not found."; return; }
+
+    clearForm();
+
+    // VISIBILITY TOGGLES
+    activeFormContainer.style.display = 'block';
+    startReportControls.style.display = 'none';
+
+    titleInput.value = report.title + " (Copy)";
+    descriptionInput.value = report.description;
+    
+    editReportId.value = ""; 
+
+    currentEditingData = report.inspection_data;
+
+    if (currentEditingData) {
+        for (const entry of entries) {
+            const data = currentEditingData[entry.category]?.[entry.full];
+            if (data) {
+                const radioToSelect = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"][value="${data.rating}"]`);
+                if (radioToSelect) radioToSelect.checked = true;
+                
+                const commentsEl = document.getElementById(`comments_${entry.categoryKey}_${entry.key}`);
+                if (commentsEl && data.comments) {
+                    commentsEl.value = data.comments; 
+                }
+
+                if (data.images && data.images.length > 0) {
+                    const mainPreviewContainer = document.getElementById(`previews_${entry.categoryKey}_${entry.key}`);
+                    if (mainPreviewContainer) {
+                        const previewContainer = mainPreviewContainer.querySelector('.existing-images-container');
+                        previewContainer.innerHTML = '<strong>Images from previous report:</strong><br>';
+                        
+                        const urlPromises = data.images.map(path => supabase.storage.from(BUCKET_NAME).createSignedUrl(path, 60));
+                        const urlResults = await Promise.all(urlPromises);
+                        
+                        urlResults.forEach(result => {
+                            if (result.data?.signedUrl) {
+                                const img = document.createElement('img');
+                                img.src = result.data.signedUrl;
+                                img.className = 'preview-thumbnail';
+                                img.onclick = () => showImageModal(result.data.signedUrl);
+                                previewContainer.appendChild(img);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    output.textContent = "Report copied. You are now editing a new entry.";
+    // Scroll to form
+    activeFormContainer.scrollIntoView({ behavior: 'smooth' });
+};
+
+    
+    // 1. User clicks "Start New Report"
+    if (startNewReportBtn) {
+        startNewReportBtn.addEventListener('click', () => {
+            clearForm();
+            activeFormContainer.style.display = 'block'; // Show form
+            startReportControls.style.display = 'none';  // Hide "Start" button
+            // Scroll to the form
+            window.scrollTo({
+                top: activeFormContainer.offsetTop - 20,
+                behavior: 'smooth'
+            });
+        });
+    }
+
+    // 2. User clicks "Cancel/Close"
+if (cancelFormBtn) {
+    cancelFormBtn.addEventListener('click', () => {
+        if (confirm("Close form? Unsaved changes will be lost.")) {
+            clearForm();
+            
+            if (isCurrentUserAdmin) {
+                // Admin goes back to Dashboard
+                activeFormContainer.style.display = 'none';
+                reportSection.style.display = 'none';
+                adminSection.style.display = 'block';
+                // Reload reports to ensure view is fresh
+                loadAllReports();
+            } else {
+                // User stays in Report Section, hides form, shows Start Button
+                activeFormContainer.style.display = 'none';
+                startReportControls.style.display = 'block';
+            }
+            window.scrollTo(0, 0);
+        }
+    });
+}
+  </script>
+</body>
+</html>
