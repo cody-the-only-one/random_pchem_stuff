@@ -646,11 +646,14 @@ function setupReportButtons(userId, isAdmin) {
         const title = titleInput.value;
         if (!title) { output.textContent = "Please fill in the report title."; return; }
         
-        // Validation for non-admins submitting
+        // Validation: If submitting (and not admin), check for completeness
         if (status === 'submitted' && !isAdmin) {
             const incompleteEntries = [];
             for (const entry of entries) {
                 const isChecked = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"]:checked`);
+                // If it's a Corrective Action, Deficient items are disabled (checked but disabled).
+                // We must ensure we count those as "complete".
+                // But generally, a disabled checkbox is still :checked if it has the attribute.
                 if (!isChecked) {
                     incompleteEntries.push(entry);
                 }
@@ -683,31 +686,38 @@ function setupReportButtons(userId, isAdmin) {
             return;
         }
         
-        // Get username for comment attribution
         const username = session.user.email.split('@')[0];
-
-        // Prepare Data Object
-        // We clone currentEditingData so we don't lose structure, or start fresh if null
+        // Start with a clone of existing data to preserve structure
         const inspectionData = currentEditingData ? JSON.parse(JSON.stringify(currentEditingData)) : {};
         const filesToUpload = [];
 
+        // --- PERSIST CORRECTIVE ACTION FLAG ---
+        // 1. Get the ID directly from the input
+        const currentReportId = editReportId.value;
+        // 2. Check the *local cache* of the report to see its original status
+        const originalReport = allReportsData[currentReportId];
+        
+        // 3. Determine if this IS or WAS a corrective action
+        const wasCorrectiveStatus = originalReport && originalReport.status === 'corrective_action';
+        const hasCorrectiveFlag = currentEditingData && currentEditingData.is_corrective_flow === true;
+        
+        if (wasCorrectiveStatus || hasCorrectiveFlag) {
+            inspectionData.is_corrective_flow = true;
+        }
+        // --------------------------------------
+
         for (const entry of entries) {
-            // Ensure structure exists
             if (!inspectionData[entry.category]) inspectionData[entry.category] = {};
             if (!inspectionData[entry.category][entry.full]) {
                 inspectionData[entry.category][entry.full] = { rating: '', comments: '', images: [] };
             }
 
-            // 1. Save Rating
             const checkedRadio = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"]:checked`);
             inspectionData[entry.category][entry.full].rating = checkedRadio ? checkedRadio.value : "";
             
-            // 2. Save Comments (FIXED LOGIC)
             const newCommentInput = document.getElementById(`comments_${entry.categoryKey}_${entry.key}`);
             const newCommentText = newCommentInput.value.trim();
             
-            // Get the *original* comment from the source data (before this edit session)
-            // We look at 'currentEditingData' because 'inspectionData' is being modified right now
             let originalComment = "";
             if (currentEditingData && currentEditingData[entry.category] && currentEditingData[entry.category][entry.full]) {
                 originalComment = currentEditingData[entry.category][entry.full].comments || "";
@@ -716,20 +726,16 @@ function setupReportButtons(userId, isAdmin) {
             if (newCommentText) {
                 const timestamp = new Date().toLocaleString();
                 const attribution = `[Added by ${username} on ${timestamp}]:`;
-                
+                // Append logic: prevent duplicate attribution if user saves multiple times quickly
                 if (originalComment) {
-                    // Append new comment to old comment with 2 newlines
                     inspectionData[entry.category][entry.full].comments = originalComment + "\n\n" + attribution + "\n" + newCommentText;
                 } else {
-                    // Just the new comment
                     inspectionData[entry.category][entry.full].comments = attribution + "\n" + newCommentText;
                 }
             } else {
-                // If no new text was typed, KEEP the original comment exactly as it was
                 inspectionData[entry.category][entry.full].comments = originalComment;
             }
 
-            // 3. Queue New Images
             const inputId = `pictures_${entry.categoryKey}_${entry.key}`;
             const newFiles = processedFiles[inputId] || [];
             for (const file of newFiles) {
@@ -745,27 +751,15 @@ function setupReportButtons(userId, isAdmin) {
             inspection_data: inspectionData
         };
 
-        // --- NEW: If Admin is saving, add a verification record ---
         if (isAdmin && status !== 'draft') {
-            // Fetch existing verification data if needed, or append to it
-            // For now, we update the main payload. 
-            // Note: If you have a specific column for 'verified_data', you should append to it here.
-            // This assumes your table has a 'verified_data' JSONB column.
             const { data: currentReport } = await supabase.from('reports').select('verified_data').eq('id', editReportId.value).single();
             let verifications = currentReport?.verified_data || [];
-            
-            // Add this verification event
-            verifications.push({
-                user_id: userId,
-                verified_at: new Date().toISOString()
-            });
-            
+            verifications.push({ user_id: userId, verified_at: new Date().toISOString() });
             reportPayload.verified_data = verifications;
         }
 
         let reportId = editReportId.value;
         
-        // DB Operations
         if (!reportId) {
             const { data: newReport, error } = await supabase.from("reports").insert(reportPayload).select().single();
             if (error) { output.textContent = `Error creating report: ${error.message}`; saveDraftBtn.disabled = false; submitReportBtn.disabled = false; saveReviewBtn.disabled = false; return; }
@@ -775,7 +769,6 @@ function setupReportButtons(userId, isAdmin) {
             if (error) { output.textContent = `Error updating report: ${error.message}`; saveDraftBtn.disabled = false; submitReportBtn.disabled = false; saveReviewBtn.disabled = false; return; }
         }
 
-        // Image Uploads
         if (filesToUpload.length > 0) {
             output.textContent = `Report saved. Now uploading ${filesToUpload.length} new image(s)...`;
             for (const item of filesToUpload) {
@@ -785,6 +778,7 @@ function setupReportButtons(userId, isAdmin) {
                     inspectionData[item.category][item.full].images.push(filePath);
                 }
             }
+            // Update the JSON with the new image paths
             await supabase.from("reports").update({ inspection_data: inspectionData }).eq("id", reportId);
         }
         
@@ -795,7 +789,6 @@ function setupReportButtons(userId, isAdmin) {
         
         clearForm();
         
-        // Reset View State
         if (isAdmin) {
             await loadAllReports();
             reportSection.style.display = 'none';
@@ -803,6 +796,7 @@ function setupReportButtons(userId, isAdmin) {
         } else {
             await loadUserDrafts(userId);
             await loadUserSubmittedReports(userId);
+            await loadUserCorrectiveActions(userId);
             
             activeFormContainer.style.display = 'none';
             startReportControls.style.display = 'block';
@@ -828,7 +822,12 @@ function clearForm() {
     descriptionInput.value = '';
     editReportId.value = '';
     
-    document.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+    // Reset radio buttons: uncheck AND re-enable them
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.checked = false;
+        radio.disabled = false; // <--- ADDED: Ensure radios are unlocked
+    });
+
     document.querySelectorAll('#reportSection textarea, #reportSection input[type="file"]').forEach(el => el.value = '');
     
     document.querySelectorAll('.previous-comments-display').forEach(div => {
@@ -905,38 +904,51 @@ showCreateFormBtn.addEventListener('click', () => {
 window.editReport = async (id) => {
     output.textContent = `Loading report ${id}...`;
     clearForm();
+    
+    // Fetch latest data to ensure we have the flag
     const { data: report, error } = await supabase.from("reports").select("*").eq("id", id).single();
     if (error || !report) { output.textContent = `Error loading report: ${error?.message}`; return; }
 
     filterContainer.style.display = 'block';
-    
-    // --- VISIBILITY MANAGEMENT ---
-    // 1. Always show the report section and the active form
     reportSection.style.display = 'block';
     activeFormContainer.style.display = 'block';
-    
-    // 2. Hide the redundant "Start New" button
     startReportControls.style.display = 'none';
 
-    // 3. IMPORTANT: If Admin, HIDE the admin dashboard so the filter works on the form
     if (isCurrentUserAdmin) {
         adminSection.style.display = 'none';
     }
-    // -----------------------------
 
     editReportId.value = report.id;
     titleInput.value = report.title;
     descriptionInput.value = report.description;
     currentEditingData = report.inspection_data;
 
-    // ... (Keep the rest of the function exactly the same: populating radio buttons, comments, images) ...
+    // --- CHECK: Status OR Flag ---
+    // We check both the main status AND the internal flag within the JSON data
+    const isCorrectiveAction = report.status === 'corrective_action' || 
+                               (report.inspection_data && report.inspection_data.is_corrective_flow === true);
+
     if (currentEditingData) {
+        // Ensure the flag is present in our local editing copy if strictly detected
+        if (isCorrectiveAction) {
+            currentEditingData.is_corrective_flow = true;
+        }
+
         for (const entry of entries) {
             const data = currentEditingData[entry.category]?.[entry.full];
             if (data) {
+                // 1. Set the radio button state
                 const radioToSelect = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"][value="${data.rating}"]`);
                 if (radioToSelect) radioToSelect.checked = true;
                 
+                // 2. Lock items if this is a corrective flow and the item is Deficient
+                // This prevents users from changing a Deficient item to Acceptable without Admin review
+                if (isCorrectiveAction && data.rating === 'Deficient') {
+                    const radios = document.getElementsByName(`rating_${entry.categoryKey}_${entry.key}`);
+                    radios.forEach(r => r.disabled = true);
+                }
+
+                // 3. Handle Comments
                 const commentsEl = document.getElementById(`comments_${entry.categoryKey}_${entry.key}`);
                 const prevCommentsDisplay = document.getElementById(`previous_comments_${entry.categoryKey}_${entry.key}`);
                 const originalComment = data.comments || '';
@@ -948,9 +960,10 @@ window.editReport = async (id) => {
                     } else {
                         prevCommentsDisplay.style.display = 'none';
                     }
-                    commentsEl.value = '';
+                    commentsEl.value = ''; // Clear new comment box
                 }
 
+                // 4. Handle Images
                 if (data.images && data.images.length > 0) {
                     const mainPreviewContainer = document.getElementById(`previews_${entry.categoryKey}_${entry.key}`);
                     if (mainPreviewContainer) {
@@ -975,10 +988,7 @@ window.editReport = async (id) => {
         }
     }
     output.textContent = `Editing report: ${report.title}`;
-    
-    // Apply filter immediately in case the box was already checked
     applyFormFilter();
-    
     activeFormContainer.scrollIntoView({ behavior: 'smooth' });
 };
 	
@@ -1180,22 +1190,26 @@ async function loadAllReports(currentAdminId, currentAdminEmail) {
     const { data: reports, error } = await supabase.from("reports").select(`*`).order("created_at", { ascending: false });
     if (error) { output.textContent = `Failed to load reports: ${error.message}`; return; }
     
-    const verifierIds = new Set();
+    // 1. Collect ALL user IDs (Report Owners AND Verifiers) to fetch their emails
+    const profileIds = new Set();
     reports.forEach(report => {
+        if (report.user_id) profileIds.add(report.user_id); // Add the report owner/assignee
         if (report.verified_data) {
-            report.verified_data.forEach(v => verifierIds.add(v.user_id));
+            report.verified_data.forEach(v => profileIds.add(v.user_id)); // Add verifiers
         }
     });
+
     if (currentAdminId && currentAdminEmail) {
         userEmailMap[currentAdminId] = currentAdminEmail;
     }
 
-    if (verifierIds.size > 0) {
+    if (profileIds.size > 0) {
         const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id, email')
-            .in('id', Array.from(verifierIds));
-        if (profileError) console.error("Could not fetch verifier emails:", profileError);
+            .in('id', Array.from(profileIds));
+        
+        if (profileError) console.error("Could not fetch user emails:", profileError);
         else profiles.forEach(p => userEmailMap[p.id] = p.email);
     }
 
@@ -1204,19 +1218,15 @@ async function loadAllReports(currentAdminId, currentAdminEmail) {
     let activeHtml = '';
     let historyHtml = '';
 
-    // --- REVISED ACTION BUTTON LOGIC ---
     const getActionButtons = (report) => {
         let buttons = '';
         if (report.status !== 'archived') {
-            // Actions for ACTIVE reports
             buttons += `<button onclick="event.stopPropagation(); openAssignModal('${report.id}')">Assign Corrective Action</button>`;
             buttons += `<button onclick="event.stopPropagation(); archiveReport('${report.id}')">Archive</button>`;
             buttons += `<button onclick="event.stopPropagation(); editReport('${report.id}')">Review</button>`;
         } else {
-            // Actions for ARCHIVED reports
             buttons += `<button onclick="event.stopPropagation(); restoreReport('${report.id}')">Restore</button>`;
         }
-        // Delete is available for all reports, active or archived
         buttons += `<button onclick="event.stopPropagation(); deleteReport('${report.id}')">Delete</button>`;
         return buttons;
     }
@@ -1224,12 +1234,20 @@ async function loadAllReports(currentAdminId, currentAdminEmail) {
     reports.forEach(report => {
         allReportsData[report.id] = report;
         const deficientCount = countDeficient(report.inspection_data);
+        
+        // 2. Logic to display Assignee Email if status is corrective_action
+        let statusDisplay = `Status: ${report.status}`;
+        if (report.status === 'corrective_action') {
+            const assigneeEmail = userEmailMap[report.user_id] || 'Unknown User';
+            statusDisplay += ` <span style="color: #d63384; font-weight: bold;">(Assigned to: ${assigneeEmail})</span>`;
+        }
+
         const reportHtml = `
           <div class="report-summary-item">
             <div class="report-header" onclick="toggleReportDetails('${report.id}')">
               <div>
                 <strong>Title:</strong> ${report.title}<br>
-                <small>Status: ${report.status} | Deficient Items: ${deficientCount}</small>
+                <small>${statusDisplay} | Deficient Items: ${deficientCount}</small>
               </div>
               <div class="report-actions">
                 ${getActionButtons(report)}
@@ -1432,18 +1450,34 @@ async function loadUserSubmittedReports(userId) {
             allReportsData[report.id] = report;
             const date = new Date(report.created_at).toLocaleDateString();
             
+            // Check if an admin has verified/reviewed this report
+            const isReviewed = report.verified_data && report.verified_data.length > 0;
+            
+            // Determine buttons based on review status
+            let actionButtonsHtml = `<button onclick="toggleReportDetails('${report.id}')">View</button> `;
+            
+            if (!isReviewed) {
+                // If not reviewed yet, allow the user to edit the existing report
+                actionButtonsHtml += `<button onclick="editReport('${report.id}')">Edit</button>`;
+            } else {
+                // If reviewed, they can only copy it to start a new one
+                actionButtonsHtml += `<button onclick="copyAndReopenReport('${report.id}')">Copy & Reopen</button>`;
+            }
+
+            // Visual indicator text
+            const reviewStatusText = isReviewed 
+                ? '<span style="color:green; font-weight:bold;">(Reviewed)</span>' 
+                : '<span style="color:orange;">(Pending Review)</span>';
+
             html += `
               <div class="report-summary-item" style="border-left: 4px solid #007bff;">
                 <div class="report-header" style="cursor: default;">
                   <div>
                     <strong>${report.title}</strong> <span style="color:#777; font-size:0.9em;">(${date})</span><br>
-                    <small>Status: ${report.status}</small>
+                    <small>Status: ${report.status} ${reviewStatusText}</small>
                   </div>
                   <div class="report-actions">
-                    <!-- View Button toggles details -->
-                    <button onclick="toggleReportDetails('${report.id}')">View</button>
-                    <!-- Copy Button creates a new draft from this data -->
-                    <button onclick="copyAndReopenReport('${report.id}')">Copy & Reopen</button>
+                    ${actionButtonsHtml}
                   </div>
                 </div>
                 <!-- Container for details (hidden by default) -->
@@ -1465,7 +1499,6 @@ window.copyAndReopenReport = async (id) => {
 
     clearForm();
 
-    // VISIBILITY TOGGLES
     activeFormContainer.style.display = 'block';
     startReportControls.style.display = 'none';
 
@@ -1474,7 +1507,18 @@ window.copyAndReopenReport = async (id) => {
     
     editReportId.value = ""; 
 
-    currentEditingData = report.inspection_data;
+    // 1. Deep Copy the data immediately to create a new session object
+    // This prevents mutating the cached report and ensures we can add flags safely
+    currentEditingData = report.inspection_data ? JSON.parse(JSON.stringify(report.inspection_data)) : {};
+    
+    // 2. Determine if we need to enforce Corrective Action constraints
+    // If the source was actively a CA, OR if the source was already a flow from a CA
+    const isSourceCorrectiveAction = report.status === 'corrective_action' || currentEditingData.is_corrective_flow === true;
+
+    // 3. Explicitly set the flag on the NEW data object so 'setupReportButtons' sees it later
+    if (isSourceCorrectiveAction) {
+        currentEditingData.is_corrective_flow = true;
+    }
 
     if (currentEditingData) {
         for (const entry of entries) {
@@ -1482,15 +1526,26 @@ window.copyAndReopenReport = async (id) => {
             if (data) {
                 const radioToSelect = document.querySelector(`input[name="rating_${entry.categoryKey}_${entry.key}"][value="${data.rating}"]`);
                 if (radioToSelect) radioToSelect.checked = true;
+
+                // Lock deficient items if we are in a Corrective Action Flow
+                if (isSourceCorrectiveAction && data.rating === 'Deficient') {
+                    const radios = document.getElementsByName(`rating_${entry.categoryKey}_${entry.key}`);
+                    radios.forEach(r => r.disabled = true);
+                }
                 
                 const commentsEl = document.getElementById(`comments_${entry.categoryKey}_${entry.key}`);
-                if (commentsEl && data.comments) {
-                    commentsEl.value = data.comments; 
+                const prevCommentsDisplay = document.getElementById(`previous_comments_${entry.categoryKey}_${entry.key}`);
+
+                if (prevCommentsDisplay && data.comments) {
+                    prevCommentsDisplay.innerHTML = `<strong>Previous Comments:</strong><br>${data.comments}`;
+                    prevCommentsDisplay.style.display = 'block';
+                    if (commentsEl) commentsEl.value = ''; 
                 }
 
                 if (data.images && data.images.length > 0) {
                     const mainPreviewContainer = document.getElementById(`previews_${entry.categoryKey}_${entry.key}`);
                     if (mainPreviewContainer) {
+                        mainPreviewContainer.innerHTML = `<div class="existing-images-container"></div><div class="new-images-container"></div>`;
                         const previewContainer = mainPreviewContainer.querySelector('.existing-images-container');
                         previewContainer.innerHTML = '<strong>Images from previous report:</strong><br>';
                         
@@ -1513,7 +1568,6 @@ window.copyAndReopenReport = async (id) => {
     }
     
     output.textContent = "Report copied. You are now editing a new entry.";
-    // Scroll to form
     activeFormContainer.scrollIntoView({ behavior: 'smooth' });
 };
 
