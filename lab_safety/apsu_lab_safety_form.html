@@ -855,8 +855,8 @@ function clearForm() {
       });
       if (error) output.textContent = "Sign-up failed:\n" + JSON.stringify(error, null, 2);
       else {
-        window.alert("User account created! Check your email for confirmation before signing in.");
-        output.textContent = "Sign-up success! Check email for confirmation.";
+        window.alert("User account created! Now sign in.");
+        output.textContent = "Sign-up success! Now sign in.";
       }
     };
 
