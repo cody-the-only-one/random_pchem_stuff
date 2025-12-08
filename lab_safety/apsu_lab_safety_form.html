@@ -1633,7 +1633,7 @@ forgotPasswordBtn.onclick = async () => {
             output.textContent = "Error sending reset email: " + error.message;
         } else {
             output.textContent = "Check your email for the password reset link.";
-            window.alert("Reset link sent! Please check your email.");
+            window.alert("Reset link sent! Please check your email for an email from Supabase Auth. It usually ends up in the junk folder.");
         }
 };
 
