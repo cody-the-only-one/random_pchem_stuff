@@ -68,66 +68,65 @@
   <button id="updateBtn">Update Password</button>
   <div id="message"></div>
 </div>
-
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
   const supabaseUrl = "https://abhpqjalptewznfnelwf.supabase.co";
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiaHBxamFscHRld3puZm5lbHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyNDM1NzIsImV4cCI6MjA3ODgxOTU3Mn0.Zf4IkSwD1os1xJ2bs7PUOvFaih8Rz0hI_jMghh731Gw";
   
-  // Configure client to automatically handle the PKCE flow
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      detectSessionInUrl: true,
-      flowType: 'pkce'
-    }
-  });
+  // FIX: Removed the 'auth' config object. 
+  // This allows Supabase to automatically detect the #access_token in your URL.
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
   const updateBtn = document.getElementById('updateBtn');
   const newPasswordInput = document.getElementById('newPassword');
   const messageDiv = document.getElementById('message');
 
-  // --- 1. Initial State: Locked & Loading ---
+  // --- 1. Initial State ---
   updateBtn.disabled = true;
   newPasswordInput.disabled = true;
   messageDiv.textContent = "Verifying security link...";
 
-  // --- 2. Check URL for Indicators ---
-  // If we arrived here without a hash (#) or query params (?), the link is likely invalid
-  // However, Supabase might strip them very quickly, so we don't error immediately.
-  const hasHash = window.location.hash && window.location.hash.length > 1;
-  const hasSearch = window.location.search && window.location.search.length > 1;
-
-  // --- 3. Listen for Auth Changes ---
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    // Debug log to help troubleshooting
-    console.log("Auth Event:", event); 
-
-    if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || session) {
-      // User successfully verified
+  // --- 2. Function to Unlock Form ---
+  const unlockForm = () => {
+      console.log("Session found! Unlocking form.");
       messageDiv.textContent = ""; 
       updateBtn.disabled = false;
       newPasswordInput.disabled = false;
       newPasswordInput.focus();
+  };
+
+  // --- 3. Immediate Check ---
+  // Sometimes the session is loaded before the listener is attached.
+  // We check immediately if Supabase already grabbed the token from the URL.
+  supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+          unlockForm();
+      }
+  });
+
+  // --- 4. Listen for Auth Changes ---
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log("Auth Event:", event); 
+    if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || session) {
+      unlockForm();
     }
   });
 
-  // --- 4. Fallback Timeout ---
-  // If 4 seconds pass and we are still not logged in, show an error.
+  // --- 5. Fallback Timeout ---
   setTimeout(async () => {
+    // Check one last time
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        if (!hasHash && !hasSearch) {
-             messageDiv.textContent = "Invalid link. Please request a new password reset.";
-             messageDiv.className = "error";
-        } else {
-             messageDiv.textContent = "Unable to verify link. It may be expired.";
-             messageDiv.className = "error";
-        }
+    
+    // Only show error if we still have no session AND the inputs are disabled
+    if (!session && newPasswordInput.disabled) {
+         messageDiv.textContent = "Unable to verify link. It may be expired or invalid.";
+         messageDiv.className = "error";
+         console.log("Verification failed. Current Hash:", window.location.hash);
     }
-  }, 4000);
+  }, 2000);
 
-  // --- 5. Update Password Logic ---
+  // --- 6. Update Password Logic ---
   updateBtn.onclick = async () => {
     const newPassword = newPasswordInput.value;
     
@@ -154,7 +153,6 @@
       messageDiv.textContent = "Password updated successfully! Redirecting...";
       messageDiv.className = "success";
       
-      // Clear session so they have to log in with new password (optional security step)
       await supabase.auth.signOut();
 
       setTimeout(() => {
