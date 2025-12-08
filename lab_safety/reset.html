@@ -1,60 +1,71 @@
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  // Use the SAME credentials as your main file
   const supabaseUrl = "https://abhpqjalptewznfnelwf.supabase.co";
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiaHBxamFscHRld3puZm5lbHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyNDM1NzIsImV4cCI6MjA3ODgxOTU3Mn0.Zf4IkSwD1os1xJ2bs7PUOvFaih8Rz0hI_jMghh731Gw";
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  // Initialize Supabase with specific settings to ensure it detects the URL
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      detectSessionInUrl: true,
+      flowType: 'pkce'
+    }
+  });
 
   const updateBtn = document.getElementById('updateBtn');
   const newPasswordInput = document.getElementById('newPassword');
   const messageDiv = document.getElementById('message');
 
-  // 1. Set Initial State to "Loading"
-  messageDiv.textContent = "Verifying link...";
+  // 1. Initial State: Locked
   updateBtn.disabled = true;
   newPasswordInput.disabled = true;
 
-  // 2. Listen for the login event
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log("Auth Event:", event); // Debugging aid
+  // 2. Check the URL immediately
+  // A valid reset link MUST have either a #hash (implicit) or ?code (PKCE)
+  const hasHash = window.location.hash && window.location.hash.includes('type=recovery');
+  const hasCode = window.location.search && window.location.search.includes('code=');
+  const hasError = window.location.hash && window.location.hash.includes('error_description');
 
-    // If Supabase successfully processes the link, it fires PASSWORD_RECOVERY or SIGNED_IN
-    if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || session) {
-      messageDiv.textContent = ""; // Clear the loading message
+  if (hasError) {
+      // Supabase sent us back with an explicit error (e.g. link expired)
+      const params = new URLSearchParams(window.location.hash.substring(1)); // remove #
+      messageDiv.textContent = decodeURIComponent(params.get('error_description')).replace(/\+/g, ' ');
+      messageDiv.className = "error";
+  } 
+  else if (!hasHash && !hasCode) {
+      // No security codes found in URL
+      // Check if user is ALREADY logged in from a previous session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+              enableForm();
+          } else {
+              messageDiv.textContent = "Invalid or expired link. Please request a new password reset.";
+              messageDiv.className = "error";
+          }
+      });
+  } 
+  else {
+      // Valid codes found. Wait indefinitely for Supabase to process them.
+      messageDiv.textContent = "Verifying security token... please wait...";
+  }
+
+  // 3. Listen for the Auth Event
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log("Auth Event:", event);
+    
+    if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || session) {
+      enableForm();
+    }
+  });
+
+  function enableForm() {
+      messageDiv.textContent = ""; 
       updateBtn.disabled = false;
       newPasswordInput.disabled = false;
       newPasswordInput.focus();
-    } 
-  });
+  }
 
-  // 3. Fallback Check
-  // Sometimes the event fires before the script runs. We double check after 1 second.
-  // Only show the error if we are STILL not logged in after waiting.
-  setTimeout(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-       // Check if there are actually URL parameters (hash or search)
-       // If there are no parameters, it's definitely an error/direct visit.
-       const hasUrlParams = window.location.hash || window.location.search;
-       
-       if (!hasUrlParams) {
-          messageDiv.textContent = "No active reset session found. Please request a new link.";
-          messageDiv.className = "error";
-       } else {
-          // If params exist but session is null, the link might be expired or invalid
-          // But we give it another moment just in case network is slow
-          setTimeout(async () => {
-             const { data: { session: retrySession } } = await supabase.auth.getSession();
-             if(!retrySession) {
-                messageDiv.textContent = "This link appears to be invalid or expired.";
-                messageDiv.className = "error";
-             }
-          }, 2000);
-       }
-    }
-  }, 1000);
-
+  // 4. Update Button Logic
   updateBtn.onclick = async () => {
     const newPassword = newPasswordInput.value;
     
