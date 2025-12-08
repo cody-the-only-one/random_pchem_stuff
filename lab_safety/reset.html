@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Reset Password</title>
+  <style>
+    body { font-family: sans-serif; line-height: 1.6; padding: 2em; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+    input[type="password"] { width: 90%; padding: 10px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ccc; }
+    button { padding: 10px 20px; cursor: pointer; border-radius: 4px; border: none; background-color: #28a745; color: white; font-size: 1rem; width: 100%; }
+    button:hover { background-color: #218838; }
+    #message { margin-top: 15px; color: #333; font-size: 0.9em; min-height: 1.5em; white-space: pre-wrap;}
+    .error { color: #dc3545 !important; }
+    .success { color: #28a745 !important; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Set New Password</h2>
+  <p>Please enter your new password below.</p>
+  
+  <input type="password" id="newPassword" placeholder="New Password" />
+  <button id="updateBtn">Update Password</button>
+  <div id="message"></div>
+</div>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  // Use the SAME credentials as your main file
+  const supabaseUrl = "https://abhpqjalptewznfnelwf.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiaHBxamFscHRld3puZm5lbHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyNDM1NzIsImV4cCI6MjA3ODgxOTU3Mn0.Zf4IkSwD1os1xJ2bs7PUOvFaih8Rz0hI_jMghh731Gw";
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const updateBtn = document.getElementById('updateBtn');
+  const newPasswordInput = document.getElementById('newPassword');
+  const messageDiv = document.getElementById('message');
+
+  // 1. Check if we actually have a session. 
+  // When the user clicks the email link, Supabase puts the token in the URL hash fragment.
+  // The createClient automatically detects this and sets up the session.
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === "PASSWORD_RECOVERY" || session) {
+      // User is authenticated and ready to change password
+      console.log("Session active, ready to update.");
+    } else {
+      // If someone just visited reset.html directly without a link
+      messageDiv.textContent = "No active reset session found. Please request a new password reset link.";
+      messageDiv.className = "error";
+      updateBtn.disabled = true;
+      newPasswordInput.disabled = true;
+    }
+  });
+
+  updateBtn.onclick = async () => {
+    const newPassword = newPasswordInput.value;
+    
+    if (!newPassword || newPassword.length < 6) {
+      messageDiv.textContent = "Password must be at least 6 characters.";
+      messageDiv.className = "error";
+      return;
+    }
+
+    updateBtn.disabled = true;
+    updateBtn.textContent = "Updating...";
+
+    const { data, error } = await supabase.auth.updateUser({ 
+      password: newPassword 
+    });
+
+    if (error) {
+      messageDiv.textContent = "Error: " + error.message;
+      messageDiv.className = "error";
+      updateBtn.disabled = false;
+      updateBtn.textContent = "Update Password";
+    } else {
+      messageDiv.textContent = "Password updated successfully! Redirecting...";
+      messageDiv.className = "success";
+      
+      // Redirect back to main page after 2 seconds
+      setTimeout(() => {
+        window.location.href = "https://cody-the-only-one.github.io/random_pchem_stuff/lab_safety/apsu_lab_safety_form.html"; 
+      }, 2000);
+    }
+  };
+</script>
+
+</body>
+</html>
