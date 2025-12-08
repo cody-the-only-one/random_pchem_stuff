@@ -140,6 +140,7 @@
     <input type="password" id="passwordInput" placeholder="Password" />
     <button id="signUpBtn">Sign Up</button>
     <button id="signInBtn">Sign In</button>
+	<button id="forgotPasswordBtn" style="background-color: #6c757d; color: white; border-color: #6c757d; margin-left: 5px;">Forgot Password?</button>
   </div>
   <button id="signOutBtn" style="display: none;">Sign Out</button>
 
@@ -263,6 +264,7 @@
     const filterContainer = document.getElementById('filterContainer');
     const emailInput = document.getElementById("emailInput"), passwordInput = document.getElementById("passwordInput");
     const signUpBtn = document.getElementById("signUpBtn"), signInBtn = document.getElementById("signInBtn"), signOutBtn = document.getElementById("signOutBtn");
+	const forgotPasswordBtn = document.getElementById("forgotPasswordBtn"); 
     const authSection = document.getElementById("authSection"), reportSection = document.getElementById("reportSection"), adminSection = document.getElementById("adminSection");
     const titleInput = document.getElementById("titleInput"), descriptionInput = document.getElementById("descriptionInput"), statusInput = document.getElementById("statusInput");
     const saveReportBtn = document.getElementById("saveReportBtn"), editReportId = document.getElementById("editReportId");
@@ -274,6 +276,7 @@
     const activeFormContainer = document.getElementById('activeFormContainer');
     const cancelFormBtn = document.getElementById('cancelFormBtn');
     const startReportControls = document.getElementById('startReportControls');
+	
     let allReportsData = {};
     let isCurrentUserAdmin = false; 
     // --- NEW: IMAGE PROCESSING CONFIGURATION & STATE ---
@@ -1608,6 +1611,32 @@ if (cancelFormBtn) {
         }
     });
 }
+
+forgotPasswordBtn.onclick = async () => {
+        const email = emailInput.value;
+        if (!email) {
+            output.textContent = "Please enter your email address to reset your password.";
+            return;
+        }
+
+        output.textContent = "Sending reset link...";
+        
+        // This constructs the full URL to reset.html dynamically
+        // e.g. http://localhost:5500/reset.html
+        const redirectUrl = "https://cody-the-only-one.github.io/random_pchem_stuff/lab_safety/reset.html";
+
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: redirectUrl,
+        });
+
+        if (error) {
+            output.textContent = "Error sending reset email: " + error.message;
+        } else {
+            output.textContent = "Check your email for the password reset link.";
+            window.alert("Reset link sent! Please check your email.");
+        }
+};
+
   </script>
 </body>
 </html>
