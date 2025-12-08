@@ -33,91 +33,61 @@
 
   const supabaseUrl = "https://abhpqjalptewznfnelwf.supabase.co";
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiaHBxamFscHRld3puZm5lbHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyNDM1NzIsImV4cCI6MjA3ODgxOTU3Mn0.Zf4IkSwD1os1xJ2bs7PUOvFaih8Rz0hI_jMghh731Gw";
+
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const updateBtn = document.getElementById('updateBtn');
   const newPasswordInput = document.getElementById('newPassword');
   const messageDiv = document.getElementById('message');
 
-  // Initial State
+  // Disable form initially
   updateBtn.disabled = true;
   newPasswordInput.disabled = true;
   messageDiv.textContent = "Verifying security link...";
 
-  const unlockForm = () => {
-      console.log("Form unlocked.");
-      messageDiv.textContent = ""; 
-      updateBtn.disabled = false;
-      newPasswordInput.disabled = false;
-      newPasswordInput.focus();
-  };
-
-  // --- MANUAL PARSING STRATEGY ---
-  // If Supabase auto-detection fails, we do it ourselves.
-  async function handleHashFragment() {
-      // 1. Get the hash from the URL (e.g., #access_token=...&refresh_token=...)
-      const hash = window.location.hash.substring(1); // Remove the '#'
-      
-      if (!hash) {
-          console.log("No hash found.");
-          return false;
-      }
-
-      // 2. Turn the string into a map of values
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-
-      // 3. If we found tokens, FORCE Supabase to use them
-      if (accessToken && refreshToken) {
-          console.log("Manual tokens found. Setting session...");
-          const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-          });
-
-          if (!error) {
-              unlockForm();
-              return true;
-          } else {
-              console.error("Manual session set failed:", error);
-          }
-      }
-      return false;
+  // --- Manual hash parser ---
+  function parseHash(hash) {
+    const result = {};
+    hash.slice(1).split('&').forEach(pair => {
+      const [key, value] = pair.split('=');
+      result[key] = decodeURIComponent(value);
+    });
+    return result;
   }
 
-  // --- EXECUTION ---
-  
-  // Try the manual method immediately
-  handleHashFragment().then((success) => {
-      if (!success) {
-          // If manual failed, check if Supabase did it automatically
-          supabase.auth.getSession().then(({ data: { session } }) => {
-              if (session) unlockForm();
-              else {
-                  // Wait a moment for listeners, then show error
-                  setTimeout(() => {
-                      if (newPasswordInput.disabled) {
-                          messageDiv.textContent = "Unable to verify link. It may be expired.";
-                          messageDiv.className = "error";
-                      }
-                  }, 2000);
-              }
-          });
+  async function init() {
+    const params = parseHash(window.location.hash);
+    const accessToken = params.access_token;
+    const refreshToken = params.refresh_token;
+
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+
+      if (error) {
+        messageDiv.textContent = "Unable to verify link. It may be expired.";
+        messageDiv.className = "error";
+        console.error(error);
+      } else {
+        // Unlock form
+        messageDiv.textContent = "";
+        updateBtn.disabled = false;
+        newPasswordInput.disabled = false;
+        newPasswordInput.focus();
       }
-  });
-
-  // Listener Backup
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || session) {
-      unlockForm();
+    } else {
+      messageDiv.textContent = "No valid recovery link found.";
+      messageDiv.className = "error";
     }
-  });
+  }
 
-  // --- UPDATE LOGIC ---
+  init();
+
+  // --- Update password ---
   updateBtn.onclick = async () => {
     const newPassword = newPasswordInput.value;
-    
     if (!newPassword || newPassword.length < 6) {
       messageDiv.textContent = "Password must be at least 6 characters.";
       messageDiv.className = "error";
@@ -139,7 +109,9 @@
       messageDiv.textContent = "Password updated! Redirecting...";
       messageDiv.className = "success";
       await supabase.auth.signOut();
-      setTimeout(() => { window.location.href = "https://cody-the-only-one.github.io/random_pchem_stuff/lab_safety/apsu_lab_safety_form.html"; }, 2000);
+      setTimeout(() => {
+        window.location.href = "https://cody-the-only-one.github.io/random_pchem_stuff/lab_safety/apsu_lab_safety_form.html";
+      }, 2000);
     }
   };
 </script>
