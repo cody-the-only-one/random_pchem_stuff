@@ -1224,6 +1224,7 @@ async function loadAllReports(currentAdminId, currentAdminEmail) {
     const getActionButtons = (report) => {
         let buttons = '';
         if (report.status !== 'archived') {
+			buttons += `<button onclick="event.stopPropagation(); exportReportToCSV('${report.id}')" style="background-color: #17a2b8; color: white; border-color: #17a2b8;">Export CSV</button>`;
             buttons += `<button onclick="event.stopPropagation(); openAssignModal('${report.id}')">Assign Corrective Action</button>`;
             buttons += `<button onclick="event.stopPropagation(); archiveReport('${report.id}')">Archive</button>`;
             buttons += `<button onclick="event.stopPropagation(); editReport('${report.id}')">Review</button>`;
@@ -1459,6 +1460,8 @@ async function loadUserSubmittedReports(userId) {
             // Determine buttons based on review status
             let actionButtonsHtml = `<button onclick="toggleReportDetails('${report.id}')">View</button> `;
             
+			actionButtonsHtml += `<button onclick="event.stopPropagation(); exportReportToCSV('${report.id}')" style="background-color: #17a2b8; color: white; border-color: #17a2b8;">Export CSV</button> `;
+			
             if (!isReviewed) {
                 // If not reviewed yet, allow the user to edit the existing report
                 actionButtonsHtml += `<button onclick="editReport('${report.id}')">Edit</button>`;
@@ -1635,6 +1638,57 @@ forgotPasswordBtn.onclick = async () => {
             output.textContent = "Check your email for the password reset link.";
             window.alert("Reset link sent! Please check your email for an email from Supabase Auth. It usually ends up in the junk folder.");
         }
+};
+
+window.exportReportToCSV = (reportId) => {
+    const report = allReportsData[reportId];
+    if (!report || !report.inspection_data) {
+        alert("Report data not found or empty.");
+        return;
+    }
+
+    // 1. Define CSV headers
+    let csvContent = "Category,Checklist Item,Status,Comments\n";
+
+    // Helper function to safely escape strings for CSV format
+    const escapeCSV = (str) => {
+        if (str === null || str === undefined) return '""';
+        const stringified = String(str);
+        // If the text contains quotes, commas, or newlines, wrap in quotes and escape internal quotes
+        if (stringified.includes('"') || stringified.includes(',') || stringified.includes('\n')) {
+            return `"${stringified.replace(/"/g, '""')}"`;
+        }
+        return stringified;
+    };
+
+    // 2. Loop through categories and entries
+    for (const category in report.inspection_data) {
+        for (const itemText in report.inspection_data[category]) {
+            const data = report.inspection_data[category][itemText];
+            
+            const catEscaped = escapeCSV(category);
+            const itemEscaped = escapeCSV(itemText);
+            const statusEscaped = escapeCSV(data.rating || 'Not Rated');
+            const commentsEscaped = escapeCSV(data.comments || '');
+
+            // 3. Add row to CSV
+            csvContent += `${catEscaped},${itemEscaped},${statusEscaped},${commentsEscaped}\n`;
+        }
+    }
+
+    // 4. Create a downloadable Blob
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    
+    // Create a clean filename
+    const safeTitle = (report.title || 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    link.setAttribute("href", url);
+    link.setAttribute("download", `safety_report_${safeTitle}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
   </script>
