@@ -221,6 +221,7 @@
   <div id="adminSection" style="display: none;">
     <h3>Admin Dashboard</h3>
     <button id="showCreateFormBtn">Create New Report</button>
+    <button id="exportAllActiveBtn" style="background-color: #17a2b8; color: white; border-color: #17a2b8; margin-left: 10px;">Export All Active to CSV</button>
 
     <hr>
     <h4>Active Reports</h4>
@@ -1640,56 +1641,98 @@ forgotPasswordBtn.onclick = async () => {
         }
 };
 
+// export to csv stuff
+
+// Helper functions for CSV generation
+const escapeCSV = (str) => {
+    if (str === null || str === undefined) return '""';
+    const stringified = String(str);
+    if (stringified.includes('"') || stringified.includes(',') || stringified.includes('\n')) {
+        return `"${stringified.replace(/"/g, '""')}"`;
+    }
+    return stringified;
+};
+
+const parseComments = (commentString) => {
+    if (!commentString) return ['', '', '', ''];
+    // Split by the double newline which separates different entries
+    const rawComments = commentString.split('\n\n');
+    const cleanComments = rawComments.map(c => {
+        // Regex to strip out the "[Added by user on date]:\n" attribution
+        return c.replace(/^\[Added by .*?\]:\s*/, '').trim();
+    });
+    // Ensure we have exactly 4 columns
+    while (cleanComments.length < 4) cleanComments.push('');
+    return cleanComments.slice(0, 4); // Take only the first 4 if there are more
+};
+
+// 1. Single Report Export (Updated with separated comments)
 window.exportReportToCSV = (reportId) => {
     const report = allReportsData[reportId];
-    if (!report || !report.inspection_data) {
-        alert("Report data not found or empty.");
-        return;
-    }
+    if (!report || !report.inspection_data) return alert("Report data not found or empty.");
 
-    // 1. Define CSV headers
-    let csvContent = "Category,Checklist Item,Status,Comments\n";
+    let csvContent = "Category,Checklist Item,Status,Comment 1,Comment 2,Comment 3,Comment 4\n";
 
-    // Helper function to safely escape strings for CSV format
-    const escapeCSV = (str) => {
-        if (str === null || str === undefined) return '""';
-        const stringified = String(str);
-        // If the text contains quotes, commas, or newlines, wrap in quotes and escape internal quotes
-        if (stringified.includes('"') || stringified.includes(',') || stringified.includes('\n')) {
-            return `"${stringified.replace(/"/g, '""')}"`;
-        }
-        return stringified;
-    };
-
-    // 2. Loop through categories and entries
     for (const category in report.inspection_data) {
         for (const itemText in report.inspection_data[category]) {
             const data = report.inspection_data[category][itemText];
             
-            const catEscaped = escapeCSV(category);
-            const itemEscaped = escapeCSV(itemText);
-            const statusEscaped = escapeCSV(data.rating || 'Not Rated');
-            const commentsEscaped = escapeCSV(data.comments || '');
-
-            // 3. Add row to CSV
-            csvContent += `${catEscaped},${itemEscaped},${statusEscaped},${commentsEscaped}\n`;
+            const comments = parseComments(data.comments);
+            csvContent += `${escapeCSV(category)},${escapeCSV(itemText)},${escapeCSV(data.rating || 'Not Rated')},${escapeCSV(comments[0])},${escapeCSV(comments[1])},${escapeCSV(comments[2])},${escapeCSV(comments[3])}\n`;
         }
     }
 
-    // 4. Create a downloadable Blob
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    
-    // Create a clean filename
     const safeTitle = (report.title || 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    link.setAttribute("href", url);
-    link.setAttribute("download", `safety_report_${safeTitle}.csv`);
-    
+    link.href = URL.createObjectURL(blob);
+    link.download = `safety_report_${safeTitle}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 };
+
+// 2. Export All Active Reports
+window.exportAllActiveToCSV = () => {
+    // Filter out archived reports (matches the UI's "Active" list)
+    const activeReports = Object.values(allReportsData).filter(r => r.status !== 'archived');
+    
+    if (activeReports.length === 0) return alert("No active reports found to export.");
+
+    // Added "Report Title" and "Report Status" as the first columns
+    let csvContent = "Report Title,Report Status,Category,Checklist Item,Status,Comment 1,Comment 2,Comment 3,Comment 4\n";
+
+    activeReports.forEach(report => {
+        if (!report.inspection_data) return;
+        
+        const rTitle = escapeCSV(report.title);
+        const rStatus = escapeCSV(report.status);
+
+        for (const category in report.inspection_data) {
+            for (const itemText in report.inspection_data[category]) {
+                const data = report.inspection_data[category][itemText];
+                
+                const comments = parseComments(data.comments);
+                csvContent += `${rTitle},${rStatus},${escapeCSV(category)},${escapeCSV(itemText)},${escapeCSV(data.rating || 'Not Rated')},${escapeCSV(comments[0])},${escapeCSV(comments[1])},${escapeCSV(comments[2])},${escapeCSV(comments[3])}\n`;
+            }
+        }
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.download = `all_active_safety_reports_${dateStr}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+// Bind the new Export All button
+const exportAllBtn = document.getElementById('exportAllActiveBtn');
+if (exportAllBtn) {
+    exportAllBtn.addEventListener('click', window.exportAllActiveToCSV);
+}
 
   </script>
 </body>
