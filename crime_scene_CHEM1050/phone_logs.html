@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forensic SMS Log Examiner - CASE-0247</title>
+  <style>
+    :root {
+      --bg-main: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #27354a;
+      --border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-dark: #0284c7;
+      --accent: #a855f7;
+      --badge-auto: #64748b;
+      --bubble-sent: #0369a1;
+      --bubble-recv: #334155;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .case-info h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-case {
+      font-size: 0.75rem;
+      background: var(--primary-dark);
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .case-meta {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 4px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stats-pill {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-align: right;
+    }
+    .stats-pill .count {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: var(--primary);
+    }
+    .stats-pill .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Filter Controls Panel */
+    .controls {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      align-items: end;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      background-color: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #fff;
+      padding: 9px 12px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 9px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: #fff;
+    }
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    .btn-toggle {
+      background: #0f172a;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-toggle.active {
+      background: var(--primary-dark);
+      color: #fff;
+      border-color: var(--primary-dark);
+    }
+
+    /* View Switcher */
+    .view-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .view-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* Table View */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    thead th {
+      background-color: #162032;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    thead th:hover {
+      color: #fff;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.15s;
+    }
+
+    tbody tr:hover {
+      background-color: var(--bg-card-hover);
+    }
+
+    td {
+      padding: 12px 16px;
+      vertical-align: top;
+    }
+
+    .id-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .party {
+      display: flex;
+      flex-direction: column;
+    }
+    .party-name {
+      font-weight: 600;
+      color: #fff;
+    }
+    .party-phone {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .timestamp {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    .type-pill {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      display: inline-block;
+    }
+    .type-sms { background: rgba(56, 189, 248, 0.2); color: var(--primary); }
+    .type-automated { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+    .msg-content {
+      color: #e2e8f0;
+      word-break: break-word;
+      line-height: 1.45;
+    }
+
+    /* Bubble / Conversation View */
+    .conversation-view {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 10px 0;
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    .chat-bubble-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      position: relative;
+    }
+
+    .chat-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 6px;
+    }
+
+    .chat-parties {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-parties strong {
+      color: #fff;
+    }
+    .arrow {
+      color: var(--primary);
+    }
+
+    .chat-body {
+      font-size: 0.95rem;
+      color: #f1f5f9;
+      margin-top: 8px;
+    }
+
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    /* Highlight Search */
+    mark {
+      background: rgba(250, 204, 21, 0.4);
+      color: #fff;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="case-info">
+        <h1>
+          Case SMS Log Archive
+          <span class="badge-case" id="caseId">CASE-0247</span>
+        </h1>
+        <div class="case-meta">
+          <span id="caseTitle">"A Love That Shouldn't Have Been"</span>
+          <span>•</span>
+          <span id="caseTz">America/Chicago</span>
+          <span>•</span>
+          <span>Dataset: SMS Extraction Export</span>
+        </div>
+      </div>
+      <div class="stats-pill">
+        <div class="count" id="displayCount">0 / 0</div>
+        <div class="label">Messages Displayed</div>
+      </div>
+    </header>
+
+    <!-- Filters & Sort Controls -->
+    <div class="controls">
+      <!-- Search -->
+      <div class="control-group">
+        <label for="searchQuery">Search Text</label>
+        <input type="text" id="searchQuery" placeholder="Filter message content..." />
+      </div>
+
+      <!-- Specific Sender -->
+      <div class="control-group">
+        <label for="filterSender">Sender</label>
+        <select id="filterSender">
+          <option value="">All Senders</option>
+        </select>
+      </div>
+
+      <!-- Specific Receiver -->
+      <div class="control-group">
+        <label for="filterReceiver">Receiver</label>
+        <select id="filterReceiver">
+          <option value="">All Receivers</option>
+        </select>
+      </div>
+
+      <!-- Conversation Pair Filter -->
+      <div class="control-group">
+        <label for="filterPair">Two-Way Conversation</label>
+        <select id="filterPair">
+          <option value="">All Dialogues</option>
+        </select>
+      </div>
+
+      <!-- Type Filter -->
+      <div class="control-group">
+        <label for="filterType">Message Type</label>
+        <select id="filterType">
+          <option value="">All Types</option>
+          <option value="sms">SMS Only</option>
+          <option value="automated">Automated Only</option>
+        </select>
+      </div>
+
+      <!-- Sort Order -->
+      <div class="control-group">
+        <label for="sortOrder">Sort By</label>
+        <select id="sortOrder">
+          <option value="time-asc">Time (Oldest First)</option>
+          <option value="time-desc">Time (Newest First)</option>
+          <option value="sender-asc">Sender Name (A → Z)</option>
+          <option value="record-asc">Record ID (Asc)</option>
+        </select>
+      </div>
+
+      <!-- Actions -->
+      <div class="control-group btn-row">
+        <button class="btn btn-secondary" id="resetBtn" style="flex: 1;">Reset Filters</button>
+      </div>
+    </div>
+
+    <!-- View Switcher -->
+    <div class="view-toolbar">
+      <div class="view-tabs">
+        <button class="btn btn-toggle active" id="tabTable">Table View</button>
+        <button class="btn btn-toggle" id="tabChat">Dialogue / Feed View</button>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);" id="summaryStatus"></div>
+    </div>
+
+    <!-- Table View Section -->
+    <div id="tableView" class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 85px;">ID</th>
+            <th style="width: 170px;">Date &amp; Time</th>
+            <th style="width: 190px;">From (Sender)</th>
+            <th style="width: 190px;">To (Receiver)</th>
+            <th>Message</th>
+            <th style="width: 90px;">Type</th>
+          </tr>
+        </thead>
+        <tbody id="logsTableBody">
+          <!-- Dynamic Content -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Dialogue / Thread View Section -->
+    <div id="chatView" class="conversation-view" style="display: none;">
+      <!-- Dynamic Content -->
+    </div>
+
+  </div>
+
+  <script>
+    // Embedded Case Dataset
+    const RAW_DATA = {
+  "case_id": "CASE-0247",
+  "title": "A Love That Shouldn't Have Been",
+  "dataset_type": "fictional_content_inclusive_sms_export",
+  "timezone": "America/Chicago",
+  "note": "All people, numbers, and messages are fictional. This is a classroom simulation, not an actual carrier record.",
+  "contacts": [
+    { "name": "Roberto Montana", "phone": "+1-931-555-0101" },
+    { "name": "Julie Campbell", "phone": "+1-931-555-0102" },
+    { "name": "Victor Montana", "phone": "+1-931-555-0103" },
+    { "name": "Elena Montana", "phone": "+1-931-555-0104" },
+    { "name": "Richard Campbell", "phone": "+1-931-555-0105" },
+    { "name": "Margaret Campbell", "phone": "+1-931-555-0106" },
+    { "name": "Unknown / automated sender", "phone": "+1-800-555-0199" }
+  ],
+  "messages": [
+    { "record_id": "SMS-0001", "timestamp": "2026-10-24T08:12:00-05:00", "sender": "+1-931-555-0104", "sender_name": "Elena Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Are you coming for dinner Sunday? Your father invited the Millers.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0002", "timestamp": "2026-10-24T08:16:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0104", "receiver_name": "Elena Montana", "message": "I'll let you know. Work is a little crazy right now.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0003", "timestamp": "2026-10-24T09:03:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Congratulations! You have been selected for an exclusive rewards offer. Reply YES to claim.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0004", "timestamp": "2026-10-24T10:14:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0106", "receiver_name": "Margaret Campbell", "message": "Did you move the blue folder from my desk?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0005", "timestamp": "2026-10-24T10:16:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "It's on the kitchen counter. Your father was looking for it too.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0006", "timestamp": "2026-10-24T11:30:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I need you at the office Monday morning. We have a meeting at nine.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0007", "timestamp": "2026-10-24T11:34:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0105", "receiver_name": "Richard Campbell", "message": "I know. I'll be there.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0008", "timestamp": "2026-10-24T13:41:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I found that little coffee place you mentioned.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0009", "timestamp": "2026-10-24T13:43:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "The one by the old theater? I love that place.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0010", "timestamp": "2026-10-24T15:12:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0103", "receiver_name": "Victor Montana", "message": "Did the contractor ever send the revised estimate?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0011", "timestamp": "2026-10-24T15:16:00-05:00", "sender": "+1-931-555-0103", "sender_name": "Victor Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Yes. Check your email. Don't approve anything until I look at it.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0012", "timestamp": "2026-10-24T18:08:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Sometimes I think we should just leave for a weekend and turn our phones off.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0013", "timestamp": "2026-10-24T18:10:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "A weekend might not be long enough.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0014", "timestamp": "2026-10-24T19:22:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Your package could not be delivered. Confirm your address using the link in the message.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0015", "timestamp": "2026-10-25T08:26:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "You left your jacket in the car. I'll bring it inside.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0016", "timestamp": "2026-10-25T09:44:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0106", "receiver_name": "Margaret Campbell", "message": "Have you spoken to Julie about Monday?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0017", "timestamp": "2026-10-25T09:47:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0105", "receiver_name": "Richard Campbell", "message": "She knows about the meeting. I think she's just tired of being told what to do.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0018", "timestamp": "2026-10-25T12:03:00-05:00", "sender": "+1-931-555-0103", "sender_name": "Victor Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Your mother says you haven't answered about dinner.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0019", "timestamp": "2026-10-25T12:11:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0103", "receiver_name": "Victor Montana", "message": "I said I'll let her know.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0020", "timestamp": "2026-10-25T16:21:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "My dad wants me at the office all day tomorrow.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0021", "timestamp": "2026-10-25T16:25:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "You don't have to do everything he asks.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0022", "timestamp": "2026-10-25T16:26:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "It's not that simple. You know that.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0023", "timestamp": "2026-10-25T17:42:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Your bank account has been temporarily restricted. Call the number on your card.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0024", "timestamp": "2026-10-25T19:08:00-05:00", "sender": "+1-931-555-0104", "sender_name": "Elena Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "I found your old school photos. You were missing two front teeth in every picture.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0025", "timestamp": "2026-10-25T19:11:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0104", "receiver_name": "Elena Montana", "message": "Please destroy those immediately.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0026", "timestamp": "2026-10-26T08:35:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "We need to talk about your plans after graduation. Call me when you have a minute.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0027", "timestamp": "2026-10-26T08:51:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0105", "receiver_name": "Richard Campbell", "message": "I'm busy today. We can talk tomorrow.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0028", "timestamp": "2026-10-26T11:06:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I got the email about the position. They want an answer by Friday.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0029", "timestamp": "2026-10-26T11:09:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Then we need to decide soon.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0030", "timestamp": "2026-10-26T13:22:00-05:00", "sender": "+1-931-555-0103", "sender_name": "Victor Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "The Campbell project is back on the table. Keep your distance from that situation.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0031", "timestamp": "2026-10-26T13:29:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0103", "receiver_name": "Victor Montana", "message": "I don't want to discuss business tonight.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0032", "timestamp": "2026-10-26T16:44:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I left soup in the fridge if you're home late.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0033", "timestamp": "2026-10-26T16:49:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0106", "receiver_name": "Margaret Campbell", "message": "Thanks. I might be out for a while.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0034", "timestamp": "2026-10-26T19:16:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Could you meet tomorrow evening? I have something important to tell you.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0035", "timestamp": "2026-10-26T19:19:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Yes. After ten would be better.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0036", "timestamp": "2026-10-26T20:03:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Reminder: Your appointment is scheduled for tomorrow at 9:30 AM. Reply C to confirm.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0037", "timestamp": "2026-10-27T07:46:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Your mother says you might be going out tonight. Where are you going?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0038", "timestamp": "2026-10-27T07:51:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0105", "receiver_name": "Richard Campbell", "message": "I have plans. I'll be back later.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0039", "timestamp": "2026-10-27T08:12:00-05:00", "sender": "+1-931-555-0103", "sender_name": "Victor Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Lunch with the Hendersons moved to Thursday. Update your calendar.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0040", "timestamp": "2026-10-27T08:15:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0103", "receiver_name": "Victor Montana", "message": "Okay. I'll update it.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0041", "timestamp": "2026-10-27T09:07:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Did you sleep at all last night?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0042", "timestamp": "2026-10-27T09:12:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Not much. I'll explain tonight.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0043", "timestamp": "2026-10-27T12:03:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Your subscription renewal failed. Update your payment information to avoid interruption.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0044", "timestamp": "2026-10-27T16:38:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Are you still coming home for dinner?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0045", "timestamp": "2026-10-27T16:42:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0106", "receiver_name": "Margaret Campbell", "message": "Probably not. Please save me some for tomorrow.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0046", "timestamp": "2026-10-27T17:06:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I should be home by ten. The building has been noisy all afternoon.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0047", "timestamp": "2026-10-27T17:29:00-05:00", "sender": "+1-931-555-0104", "sender_name": "Elena Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Your father is in a mood again. Don't let him get to you.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0048", "timestamp": "2026-10-27T17:34:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0104", "receiver_name": "Elena Montana", "message": "I'm fine, Mom. Just tired.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0049", "timestamp": "2026-10-27T18:03:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I expect you home tonight. We are not finished talking.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0050", "timestamp": "2026-10-27T18:09:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0105", "receiver_name": "Richard Campbell", "message": "I'll call you tomorrow. I need some time to think.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0051", "timestamp": "2026-10-27T18:44:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Limited time offer! You may qualify for a lower monthly payment. Reply STOP to opt out.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0052", "timestamp": "2026-10-27T19:12:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Are we still on for later?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0053", "timestamp": "2026-10-27T19:18:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Yes. I just need to sort a few things out first.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0054", "timestamp": "2026-10-27T19:46:00-05:00", "sender": "+1-931-555-0103", "sender_name": "Victor Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Call me before you make any decisions about the offer.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0055", "timestamp": "2026-10-27T19:51:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0103", "receiver_name": "Victor Montana", "message": "I'll call you tomorrow.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0056", "timestamp": "2026-10-27T20:14:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "My dad called twice. I didn't answer.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0057", "timestamp": "2026-10-27T20:16:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Don't let him pressure you into anything tonight.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0058", "timestamp": "2026-10-27T20:37:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0106", "receiver_name": "Margaret Campbell", "message": "She isn't answering her phone. Have you heard from her?", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0059", "timestamp": "2026-10-27T20:40:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0105", "receiver_name": "Richard Campbell", "message": "She texted earlier. She said she had plans.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0060", "timestamp": "2026-10-27T21:07:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I think we should wait until tomorrow. Don't come tonight.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0061", "timestamp": "2026-10-27T21:11:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "What do you mean? We agreed we'd talk tonight.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0062", "timestamp": "2026-10-27T21:14:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I'm not trying to upset you. We need to talk in person.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0063", "timestamp": "2026-10-27T21:29:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "I don't understand what's happening. Please just tell me the truth.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0064", "timestamp": "2026-10-27T21:41:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Reminder: Your appointment is scheduled for tomorrow at 9:30 AM. Reply C to confirm.", "message_type": "automated", "status": "delivered" },
+    { "record_id": "SMS-0065", "timestamp": "2026-10-27T21:53:00-05:00", "sender": "+1-931-555-0105", "sender_name": "Richard Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Julie, answer your phone. We need to settle this tonight.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0066", "timestamp": "2026-10-27T22:02:00-05:00", "sender": "+1-931-555-0102", "sender_name": "Julie Campbell", "receiver": "+1-931-555-0106", "receiver_name": "Margaret Campbell", "message": "I'm okay. I just need some time.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0067", "timestamp": "2026-10-27T22:18:00-05:00", "sender": "+1-931-555-0104", "sender_name": "Elena Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "Are you home? I left the container you wanted on the porch.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0068", "timestamp": "2026-10-27T22:24:00-05:00", "sender": "+1-931-555-0101", "sender_name": "Roberto Montana", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "I'm here. Please come in when you arrive.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0069", "timestamp": "2026-10-27T22:46:00-05:00", "sender": "+1-931-555-0103", "sender_name": "Victor Montana", "receiver": "+1-931-555-0101", "receiver_name": "Roberto Montana", "message": "I tried calling. Pick up when you see this.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0070", "timestamp": "2026-10-27T23:04:00-05:00", "sender": "+1-931-555-0106", "sender_name": "Margaret Campbell", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "It's late. Please let me know you're safe.", "message_type": "sms", "status": "delivered" },
+    { "record_id": "SMS-0071", "timestamp": "2026-10-27T23:17:00-05:00", "sender": "+1-800-555-0199", "sender_name": "Unknown / automated sender", "receiver": "+1-931-555-0102", "receiver_name": "Julie Campbell", "message": "Your account may qualify for a lower monthly payment. Visit our website for details.", "message_type": "automated", "status": "delivered" },
+  {
+    "record_id": "SMS-NEW-001",
+    "timestamp": "2026-10-17T08:14:00-05:00",
+    "sender": "+1-931-555-0106",
+    "sender_name": "Margaret Campbell",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "You left your travel mug in the car again.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-002",
+    "timestamp": "2026-10-17T08:19:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0106",
+    "receiver_name": "Margaret Campbell",
+    "message": "It's practically a family heirloom at this point. Thanks, Mom.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-003",
+    "timestamp": "2026-10-17T09:02:00-05:00",
+    "sender": "+1-800-555-0199",
+    "sender_name": "Unknown / automated sender",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "Your package is waiting. Confirm delivery preferences now.",
+    "message_type": "automated",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-004",
+    "timestamp": "2026-10-17T09:36:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "I walked past the old theater. The sign still says they're showing that terrible monster movie.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-005",
+    "timestamp": "2026-10-17T09:42:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "It's a classic. You just don't appreciate cinema.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-006",
+    "timestamp": "2026-10-17T09:43:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "I appreciate the person who made me sit through it. The movie is debatable.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-007",
+    "timestamp": "2026-10-17T11:15:00-05:00",
+    "sender": "+1-931-555-0103",
+    "sender_name": "Victor Montana",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "Dad wants the revised numbers before Monday. Don't leave it until the last minute.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-008",
+    "timestamp": "2026-10-17T11:21:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0103",
+    "receiver_name": "Victor Montana",
+    "message": "I have them. I'll send them this afternoon.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-009",
+    "timestamp": "2026-10-17T13:04:00-05:00",
+    "sender": "+1-931-555-0105",
+    "sender_name": "Richard Campbell",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "Can you pick up the folders from the office on your way home?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-010",
+    "timestamp": "2026-10-17T13:09:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0105",
+    "receiver_name": "Richard Campbell",
+    "message": "Sure. Which ones?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-011",
+    "timestamp": "2026-10-17T13:10:00-05:00",
+    "sender": "+1-931-555-0105",
+    "sender_name": "Richard Campbell",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "The blue ones. Not the old invoices.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-012",
+    "timestamp": "2026-10-17T16:48:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "I found a place outside town that has cabins and no cell service.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-013",
+    "timestamp": "2026-10-17T16:52:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "That sounds dangerously appealing.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-014",
+    "timestamp": "2026-10-17T18:27:00-05:00",
+    "sender": "+1-931-555-0104",
+    "sender_name": "Elena Montana",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "Your father says you missed his call. Everything all right?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-015",
+    "timestamp": "2026-10-17T18:34:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0104",
+    "receiver_name": "Elena Montana",
+    "message": "Yes. I was out. I'll call him later.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-016",
+    "timestamp": "2026-10-18T08:43:00-05:00",
+    "sender": "+1-931-555-0103",
+    "sender_name": "Victor Montana",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "Did you get the message from the bank about the property line?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-017",
+    "timestamp": "2026-10-18T08:47:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0103",
+    "receiver_name": "Victor Montana",
+    "message": "I did. It doesn't change the survey.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-018",
+    "timestamp": "2026-10-18T09:01:00-05:00",
+    "sender": "+1-931-555-0103",
+    "sender_name": "Victor Montana",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "It changes what Dad thinks we should do next.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-019",
+    "timestamp": "2026-10-18T09:26:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0106",
+    "receiver_name": "Margaret Campbell",
+    "message": "Do we have anything planned for Sunday afternoon?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-020",
+    "timestamp": "2026-10-18T09:32:00-05:00",
+    "sender": "+1-931-555-0106",
+    "sender_name": "Margaret Campbell",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "Your aunt might come by. Why?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-021",
+    "timestamp": "2026-10-18T09:35:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0106",
+    "receiver_name": "Margaret Campbell",
+    "message": "Just checking. I may go for a drive.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-022",
+    "timestamp": "2026-10-18T11:08:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "There's a little bookshop near the river. Thought you might like it.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-023",
+    "timestamp": "2026-10-18T11:13:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "Is this your way of asking me on a date without actually asking?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-024",
+    "timestamp": "2026-10-18T11:15:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "I'm trying to preserve a little mystery.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-025",
+    "timestamp": "2026-10-18T14:20:00-05:00",
+    "sender": "+1-800-555-0199",
+    "sender_name": "Unknown / automated sender",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "You may be eligible for a special rate. Reply STOP to opt out.",
+    "message_type": "automated",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-026",
+    "timestamp": "2026-10-18T17:02:00-05:00",
+    "sender": "+1-931-555-0105",
+    "sender_name": "Richard Campbell",
+    "receiver": "+1-931-555-0106",
+    "receiver_name": "Margaret Campbell",
+    "message": "Did Julie say whether she's free tomorrow?",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-027",
+    "timestamp": "2026-10-18T17:08:00-05:00",
+    "sender": "+1-931-555-0106",
+    "sender_name": "Margaret Campbell",
+    "receiver": "+1-931-555-0105",
+    "receiver_name": "Richard Campbell",
+    "message": "She said she had errands. You could ask her directly.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-028",
+    "timestamp": "2026-10-18T20:11:00-05:00",
+    "sender": "+1-931-555-0102",
+    "sender_name": "Julie Campbell",
+    "receiver": "+1-931-555-0101",
+    "receiver_name": "Roberto Montana",
+    "message": "Home now. I had a good time today.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-029",
+    "timestamp": "2026-10-18T20:14:00-05:00",
+    "sender": "+1-931-555-0101",
+    "sender_name": "Roberto Montana",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "Me too. I wish we didn't have to be so careful.",
+    "message_type": "sms",
+    "status": "delivered"
+  },
+  {
+    "record_id": "SMS-NEW-030",
+    "timestamp": "2026-10-19T07:52:00-05:00",
+    "sender": "+1-931-555-0105",
+    "sender_name": "Richard Campbell",
+    "receiver": "+1-931-555-0102",
+    "receiver_name": "Julie Campbell",
+    "message": "Don't forget the nine o'clock meeting tomorrow. Bring the blue folder.",
+    "message_type": "sms",
+    "status": "delivered"
+  }
+  ]
+};
+
+    // State
+    let activeView = 'table';
+    const totalRecords = RAW_DATA.messages.length;
+
+    // DOM Elements
+    const senderSelect = document.getElementById('filterSender');
+    const receiverSelect = document.getElementById('filterReceiver');
+    const pairSelect = document.getElementById('filterPair');
+    const typeSelect = document.getElementById('filterType');
+    const sortSelect = document.getElementById('sortOrder');
+    const searchInput = document.getElementById('searchQuery');
+    const resetBtn = document.getElementById('resetBtn');
+    const displayCount = document.getElementById('displayCount');
+    const summaryStatus = document.getElementById('summaryStatus');
+
+    const tableView = document.getElementById('tableView');
+    const chatView = document.getElementById('chatView');
+    const tabTable = document.getElementById('tabTable');
+    const tabChat = document.getElementById('tabChat');
+
+    // Init Header Information
+    document.getElementById('caseId').textContent = RAW_DATA.case_id;
+    document.getElementById('caseTitle').textContent = `"${RAW_DATA.title}"`;
+    document.getElementById('caseTz').textContent = RAW_DATA.timezone;
+
+    // Populate Dropdown Menus
+    function populateDropdowns() {
+      const contacts = RAW_DATA.contacts;
+
+      contacts.forEach(c => {
+        // Sender option
+        const optS = document.createElement('option');
+        optS.value = c.phone;
+        optS.textContent = `${c.name} (${c.phone})`;
+        senderSelect.appendChild(optS);
+
+        // Receiver option
+        const optR = document.createElement('option');
+        optR.value = c.phone;
+        optR.textContent = `${c.name} (${c.phone})`;
+        receiverSelect.appendChild(optR);
+      });
+
+      // Populate unique dialogue pairs
+      const pairMap = new Map();
+      RAW_DATA.messages.forEach(m => {
+        const p1 = m.sender_name;
+        const p2 = m.receiver_name;
+        const key = [p1, p2].sort().join(" ⇄ ");
+        pairMap.set(key, { p1: m.sender, p2: m.receiver, label: key });
+      });
+
+      pairMap.forEach((val, key) => {
+        const optP = document.createElement('option');
+        optP.value = key;
+        optP.textContent = key;
+        pairSelect.appendChild(optP);
+      });
+    }
+
+    // Format timestamps for legibility
+    function formatTime(isoStr) {
+      const d = new Date(isoStr);
+      return d.toLocaleString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+    }
+
+    // Highlight query helper
+    function highlight(text, query) {
+      if (!query) return text;
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escaped})`, 'gi');
+      return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    // Filter and Sort Engine
+    function getProcessedMessages() {
+      const q = searchInput.value.trim().toLowerCase();
+      const sVal = senderSelect.value;
+      const rVal = receiverSelect.value;
+      const pairVal = pairSelect.value;
+      const tVal = typeSelect.value;
+      const sortVal = sortSelect.value;
+
+      let filtered = RAW_DATA.messages.filter(msg => {
+        // Sender filter
+        if (sVal && msg.sender !== sVal) return false;
+
+        // Receiver filter
+        if (rVal && msg.receiver !== rVal) return false;
+
+        // Message type filter
+        if (tVal && msg.message_type !== tVal) return false;
+
+        // Pair filter (two-way)
+        if (pairVal) {
+          const currentPair = [msg.sender_name, msg.receiver_name].sort().join(" ⇄ ");
+          if (currentPair !== pairVal) return false;
+        }
+
+        // Text search (content + party names)
+        if (q) {
+          const textMatch = msg.message.toLowerCase().includes(q);
+          const senderMatch = msg.sender_name.toLowerCase().includes(q);
+          const receiverMatch = msg.receiver_name.toLowerCase().includes(q);
+          if (!textMatch && !senderMatch && !receiverMatch) return false;
+        }
+
+        return true;
+      });
+
+      // Sorting
+      filtered.sort((a, b) => {
+        if (sortVal === 'time-asc') return new Date(a.timestamp) - new Date(b.timestamp);
+        if (sortVal === 'time-desc') return new Date(b.timestamp) - new Date(a.timestamp);
+        if (sortVal === 'sender-asc') return a.sender_name.localeCompare(b.sender_name);
+        if (sortVal === 'record-asc') return a.record_id.localeCompare(b.record_id);
+        return 0;
+      });
+
+      return filtered;
+    }
+
+    // Render Data to Active View
+    function render() {
+      const messages = getProcessedMessages();
+      const q = searchInput.value.trim();
+
+      displayCount.textContent = `${messages.length} / ${totalRecords}`;
+      summaryStatus.textContent = `Showing ${messages.length} event${messages.length === 1 ? '' : 's'}`;
+
+      if (activeView === 'table') {
+        const tbody = document.getElementById('logsTableBody');
+        if (messages.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No records matching the filter criteria.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = messages.map(m => `
+          <tr>
+            <td><span class="id-tag">${m.record_id}</span></td>
+            <td><span class="timestamp">${formatTime(m.timestamp)}</span></td>
+            <td>
+              <div class="party">
+                <span class="party-name">${highlight(m.sender_name, q)}</span>
+                <span class="party-phone">${m.sender}</span>
+              </div>
+            </td>
+            <td>
+              <div class="party">
+                <span class="party-name">${highlight(m.receiver_name, q)}</span>
+                <span class="party-phone">${m.receiver}</span>
+              </div>
+            </td>
+            <td class="msg-content">${highlight(m.message, q)}</td>
+            <td>
+              <span class="type-pill ${m.message_type === 'sms' ? 'type-sms' : 'type-automated'}">
+                ${m.message_type}
+              </span>
+            </td>
+          </tr>
+        `).join('');
+      } else {
+        // Chat Dialogue view
+        if (messages.length === 0) {
+          chatView.innerHTML = `<div class="empty-state">No conversation records matching the filter criteria.</div>`;
+          return;
+        }
+
+        chatView.innerHTML = messages.map(m => `
+          <div class="chat-bubble-card">
+            <div class="chat-header">
+              <div class="chat-parties">
+                <span class="id-tag">${m.record_id}</span>
+                <strong>${highlight(m.sender_name, q)}</strong>
+                <span class="arrow">➔</span>
+                <span>${highlight(m.receiver_name, q)}</span>
+              </div>
+              <span class="timestamp">${formatTime(m.timestamp)}</span>
+            </div>
+            <div class="chat-body">${highlight(m.message, q)}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Reset All Filters
+    function resetFilters() {
+      searchInput.value = '';
+      senderSelect.value = '';
+      receiverSelect.value = '';
+      pairSelect.value = '';
+      typeSelect.value = '';
+      sortSelect.value = 'time-asc';
+      render();
+    }
+
+    // Event Listeners
+    [searchInput, senderSelect, receiverSelect, pairSelect, typeSelect, sortSelect].forEach(el => {
+      el.addEventListener('input', render);
+    });
+
+    resetBtn.addEventListener('click', resetFilters);
+
+    tabTable.addEventListener('click', () => {
+      activeView = 'table';
+      tabTable.classList.add('active');
+      tabChat.classList.remove('active');
+      tableView.style.display = 'block';
+      chatView.style.display = 'none';
+      render();
+    });
+
+    tabChat.addEventListener('click', () => {
+      activeView = 'chat';
+      tabChat.classList.add('active');
+      tabTable.classList.remove('active');
+      tableView.style.display = 'none';
+      chatView.style.display = 'flex';
+      render();
+    });
+
+    // Initial boot
+    populateDropdowns();
+    render();
+  </script>
+</body>
+</html>
