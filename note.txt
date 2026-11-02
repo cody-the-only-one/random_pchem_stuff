@@ -1,0 +1,3 @@
+to use any web pages, go to:
+
+https://cody-the-only-one.github.io/random_pchem_stuff/{PATH}
